@@ -1,7 +1,7 @@
 # Template file for 'Carla'
 pkgname=Carla
 version=2.4.3
-revision=1
+revision=2
 archs="x86_64* i686* aarch64* arm*"
 build_style=gnu-makefile
 pycompile_dirs="usr/share/carla"
@@ -19,10 +19,36 @@ distfiles="https://github.com/falkTX/Carla/archive/v${version}.tar.gz"
 checksum=0092926e5167f3a5eb592f0055e5491803354ae42947e706db0dc548d9e786d3
 python_version=3
 
+subpackages="Carla-devel"
+
+build_options="win"
+build_options_default=""
+
+if [ -z "$CROSS_BUILD" ]; then
+build_options_default+=" win"
+fi
+
+desc_option_win="Enable building windows bridge"
+
 case $XBPS_TARGET_MACHINE in
-	x86_64* | i686*);;
-	*) make_build_args+=" NOOPT=true"
-	   make_install_args+=" NOOPT=true";;
+	x86_64*)
+if [ "$build_option_win" ]; then
+	hostmakedepends+=" cross-x86_64-w64-mingw32 wine-tools"
+	makedepends+=" wine-devel"
+	subpackages+=" Carla-bridge-win"
+fi
+	;;
+	i686*)
+if [ "$build_option_win" ]; then
+	hostmakedepends+=" cross-i686-w64-mingw32 wine-tools"
+	makedepends+=" wine-devel"
+	subpackages+=" Carla-bridge-win"
+fi
+	;;
+	*)
+	make_build_args+=" NOOPT=true"
+	make_install_args+=" NOOPT=true"
+	;;
 esac
 
 if [ "$CROSS_BUILD" ]; then
@@ -40,6 +66,23 @@ pre_build() {
 	make ${make_build_args} features
 }
 
+post_build() {
+if [ "$build_option_win" ]; then
+	case $XBPS_TARGET_MACHINE in
+		x86_64*)
+			make ${make_build_args} wine64
+			CXXFLAGS="" CFLAGS="" LDFLAGS="" \
+				make ${makejobs} ${make_build_args} win64 CC="x86_64-w64-mingw32-gcc" CXX="x86_64-w64-mingw32-g++"
+		;;
+		i686*)
+			make ${make_build_args} wine32
+			CXXFLAGS="" CFLAGS="" LDFLAGS="" \
+				make ${makejobs} ${make_build_args} win32 CC="i686-w64-mingw32-gcc" CXX="i686-w64-mingw32-g++"
+		;;
+	esac
+fi
+}
+
 post_install() {
 	vbin bin/carla-lv2-export
 }
@@ -50,5 +93,29 @@ Carla-devel_package() {
 		vmove usr/bin/carla-lv2-export
 		vmove usr/lib/pkgconfig
 		vmove usr/include
+	}
+}
+
+Carla-bridge-win_package() {
+	lib32mode=full
+	lib32symlinks="carla/carla-bridge-win32.exe
+	 carla/carla-discovery-win32.exe
+	 carla/jackbridge-wine32.dll
+	 vst/carla.vst/carla-bridge-win32.exe
+	 vst/carla.vst/carla-carla-win32.exe
+	 vst/carla.vst/jackbridge-wine32.dll
+	 lv2/carla.lv2/carla-bridge-win32.exe
+	 lv2/carla.lv2/carla-carla-win32.exe
+	 lv2/carla.lv2/jackbridge-wine32.dll"
+
+	depends="Carla>=${version} wine"
+	short_desc+=" - windows bridge"
+	pkg_install() {
+		vmove usr/lib/carla/*.exe
+		vmove usr/lib/carla/*.dll
+		vmove usr/lib/vst/carla.vst/*.exe
+		vmove usr/lib/vst/carla.vst/*.dll
+		vmove usr/lib/lv2/carla.lv2/*.exe
+		vmove usr/lib/lv2/carla.lv2/*.dll
 	}
 }
