@@ -1,7 +1,7 @@
 # Template file for 'binutils'
 pkgname=binutils
 version=2.39
-revision=1
+revision=2
 bootstrap=yes
 hostmakedepends="pkgconf"
 makedepends="zlib-devel"
@@ -18,7 +18,7 @@ if [ "$CHROOT_READY" ]; then
 	makedepends+=" elfutils-devel"
 	checkdepends="bc"
 	depends="binutils-doc"
-	subpackages+=" binutils-devel"
+	subpackages+=" libiberty-devel binutils-devel"
 fi
 
 _get_triplet() {
@@ -36,7 +36,7 @@ do_configure() {
 	local conf
 
 	if [ "$CHROOT_READY" ]; then
-		conf+=" --with-debuginfod --enable-shared"
+		conf+=" --with-debuginfod --enable-shared --enable-install-libiberty"
 	else
 		conf+=" --without-debuginfod --disable-shared --disable-install-libbfd"
 	fi
@@ -145,7 +145,7 @@ do_install() {
 }
 
 binutils-devel_package() {
-	depends="zlib-devel libiberty-devel"
+	depends="zlib-devel"
 	short_desc+=" - development files"
 	pkg_install() {
 		vmove usr/include
@@ -161,5 +161,15 @@ binutils-doc_package() {
 		vmove usr/share/info
 		# Remove info file that conflicts with autoconf.
 		rm -f ${PKGDESTDIR}/usr/share/info/standards.info
+	}
+}
+
+libiberty-devel_package() {
+	reverts="20220713_1 20210106_1"
+	short_desc="Library of utility functions used by GNU programs"
+	conflicts="binutils-devel<=2.35.1_3"
+	pkg_install() {
+		vmove usr/include/libiberty
+		vmove usr/lib/libiberty.a
 	}
 }
