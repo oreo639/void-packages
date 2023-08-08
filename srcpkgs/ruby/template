@@ -3,14 +3,14 @@ _ruby_abiver=3.2.0
 
 pkgname=ruby
 version=3.2.2
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="--enable-shared --disable-rpath
  PKG_CONFIG=/usr/bin/pkg-config"
 make_build_args="all capi"
 hostmakedepends="pkg-config bison groff"
 makedepends="zlib-devel readline-devel libffi-devel openssl-devel
- gdbm-devel libyaml-devel pango-devel"
+ gdbm-devel libyaml-devel pango-devel libxcrypt-devel"
 short_desc="Ruby programming language"
 homepage="http://www.ruby-lang.org/en/"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
