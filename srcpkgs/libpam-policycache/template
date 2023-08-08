@@ -1,10 +1,10 @@
 # Template file for 'libpam-policycache'
 pkgname=libpam-policycache
 version=0.11
-revision=1
+revision=2
 build_style=gnu-configure
 hostmakedepends="autoconf automake libtool pkg-config"
-makedepends="glib-devel libscrypt-devel pam-devel"
+makedepends="glib-devel libscrypt-devel pam-devel libxcrypt-devel"
 short_desc="Password caching module with advanced policies for PAM"
 maintainer="Michael Aldridge <maldridge@voidlinux.org>"
 license="Apache-2.0"
