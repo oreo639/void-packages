@@ -52,6 +52,7 @@ musl-devel_package() {
 	depends="kernel-libc-headers ${sourcepkg}-${version}_${revision}"
 	replaces="libssp-devel<=12.2.0_1"
 	conflicts="libssp-devel<=12.2.0_1"
+	provides="libxcrypt-devel-0_1"
 	short_desc+=" - development files"
 	pkg_install() {
 		vmove usr/include
