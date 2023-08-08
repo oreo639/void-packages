@@ -1,7 +1,7 @@
 # Template file for 'openssh'
 pkgname=openssh
 version=9.4p1
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="--datadir=/usr/share/openssh
  --sysconfdir=/etc/ssh --without-selinux --with-privsep-user=nobody
@@ -17,7 +17,7 @@ configure_args="--datadir=/usr/share/openssh
  $(vopt_if fido2 --with-security-key-builtin)
  LD=$CC ac_cv_header_sys_cdefs_h=false"
 hostmakedepends="automake"
-makedepends="libedit-devel pam-devel zlib-devel
+makedepends="libedit-devel pam-devel zlib-devel libxcrypt-devel
  $(vopt_if gssapi 'mit-krb5-devel') $(vopt_if ldns 'libldns-devel')
  $(vopt_if ssl 'openssl-devel') $(vopt_if fido2 'libfido2-devel')"
 short_desc="OpenSSH free Secure Shell (SSH) client and server implementation"
@@ -44,7 +44,7 @@ if [ "$build_option_ldns" -a -z "$build_option_ssl" ]; then
 	broken="option 'ldns' requires option 'ssl'"
 fi
 
-CFLAGS="-Wno-format-truncation -Wno-stringop-truncation -Wno-maybe-uninitialized -Wno-deprecated-declarations"
+CFLAGS="-Wno-format-truncation -Wno-stringop-truncation -Wno-maybe-uninitialized -Wno-deprecated-declarations -Wno-use-after-free"
 
 case $XBPS_TARGET_MACHINE in
 	i686-musl)
