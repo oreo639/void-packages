@@ -1,12 +1,12 @@
 # Template file for 'guile'
 pkgname=guile
 version=2.2.7
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="--disable-static --disable-error-on-warning"
 hostmakedepends="pkg-config texinfo"
 makedepends="gc-devel gmp-devel libatomic_ops-devel libffi-devel libltdl-devel
- libunistring-devel readline-devel"
+ libunistring-devel readline-devel libxcrypt-devel"
 short_desc="Portable, embeddable Scheme implementation written in C"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="GPL-3.0-or-later, LGPL-3.0-or-later"
