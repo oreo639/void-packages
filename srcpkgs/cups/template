@@ -1,13 +1,14 @@
 # Template file for 'cups'
 pkgname=cups
 version=2.4.6
-revision=1
+revision=2
 build_style=gnu-configure
 make_install_args="BUILDROOT=${DESTDIR}"
 hostmakedepends="gnutls-devel pkg-config
  $(vopt_if avahi avahi-libs-devel)"
 makedepends="acl-devel gnutls-devel libpaper-devel libusb-devel pam-devel
- zlib-devel $(vopt_if avahi avahi-libs-devel) $(vopt_if gssapi mit-krb5-devel)"
+ zlib-devel $(vopt_if avahi avahi-libs-devel) $(vopt_if gssapi mit-krb5-devel)
+ libxcrypt-devel"
 depends="xdg-utils"
 short_desc="Common Unix Printing System"
 maintainer="Orphaned <orphan@voidlinux.org>"
