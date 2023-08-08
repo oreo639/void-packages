@@ -1,7 +1,7 @@
 # Template file for 'shadow'
 pkgname=shadow
 version=4.8.1
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="--bindir=/usr/bin --sbindir=/usr/bin
  --enable-shared --disable-static
@@ -9,7 +9,7 @@ configure_args="--bindir=/usr/bin --sbindir=/usr/bin
  --disable-nls --enable-subordinate-ids --disable-account-tools-setuid
  --with-group-name-max-length=32"
 hostmakedepends="libtool"
-makedepends="acl-devel pam-devel"
+makedepends="acl-devel pam-devel libxcrypt-devel"
 depends="pam"
 short_desc="Shadow password file utilities"
 maintainer="Enno Boland <gottox@voidlinux.org>"
