@@ -1,7 +1,7 @@
 # Template file for 'mariadb'
 pkgname=mariadb
 version=10.5.10
-revision=6
+revision=7
 build_style=cmake
 build_helper=qemu
 configure_args="-DBUILD_CONFIG=mysql_release
@@ -19,7 +19,7 @@ configure_args="-DBUILD_CONFIG=mysql_release
  -DWITH_READLINE=ON -DWITH_SYSTEMD=no -DWITH_PCRE=system"
 hostmakedepends="bison perl flex pkg-config"
 makedepends="ncurses-devel gnutls-devel libaio-devel boost-devel pam-devel zlib-devel
- pcre2-devel"
+ pcre2-devel libxcrypt-devel"
 depends="perl"
 checkdepends="perl"
 short_desc="Fast SQL database server, drop-in replacement for MySQL"
