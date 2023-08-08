@@ -4,12 +4,12 @@
 #
 pkgname=python
 version=2.7.18.7
-revision=4
+revision=5
 _commit=937f6fc83dc2f7f7156f69c993bc017a26e4f5bd
 pycompile_dirs="usr/lib/python2.7"
 hostmakedepends="pkg-config"
 makedepends="libffi-devel readline-devel gdbm-devel openssl-devel expat-devel
- sqlite-devel bzip2-devel zlib-devel"
+ sqlite-devel bzip2-devel zlib-devel libxcrypt-devel"
 depends="ca-certificates"
 short_desc="Interpreted, interactive, object-oriented programming language"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
