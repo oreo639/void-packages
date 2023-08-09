@@ -1,9 +1,9 @@
 # Template file for 'lua54-luaposix'
 pkgname=lua54-luaposix
 version=35.0
-revision=1
+revision=2
 hostmakedepends="lua51-devel lua52-devel lua53-devel lua54-devel"
-makedepends="lua51-devel lua52-devel lua53-devel lua54-devel"
+makedepends="lua51-devel lua52-devel lua53-devel lua54-devel libxcrypt-devel"
 depends="lua54 lua54-stdlib-normalize"
 _desc="POSIX library for Lua programming language"
 short_desc="${_desc} (5.4.x)"
