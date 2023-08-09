@@ -1,10 +1,10 @@
 # Template file for 'tcsh'
 pkgname=tcsh
 version=6.24.10
-revision=1
+revision=2
 build_style=gnu-configure
 conf_files="/etc/csh.login /etc/csh.cshrc"
-makedepends="ncurses-devel automake"
+makedepends="ncurses-devel automake libxcrypt-devel"
 short_desc="Enhanced but compatible version of the Berkeley C shell"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
 license="BSD-3-Clause"
