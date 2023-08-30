@@ -1,10 +1,10 @@
 # Template file for 'sqmail'
 pkgname=sqmail
 version=4.0.10
-revision=5
+revision=6
 create_wrksrc=yes
 build_wrksrc="mail/${pkgname}/${pkgname}-${version}/src"
-makedepends="fehQlibs libidn2-devel ucspi-ssl-devel"
+makedepends="fehQlibs libidn2-devel ucspi-ssl-devel libxcrypt-devel"
 depends="ucspi-ssl ucspi-tcp6"
 short_desc="Fast, secure, and reliable email transmission (s/qmail)"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
