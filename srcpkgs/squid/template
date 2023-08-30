@@ -1,7 +1,7 @@
 # Template file for 'squid'
 pkgname=squid
 version=5.7
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="
  --sysconfdir=/etc/squid
@@ -45,7 +45,7 @@ make_dirs="/var/log/squid 750 squid squid
  /var/cache/squid 750 squid squid"
 hostmakedepends="perl pkg-config"
 makedepends="libldap-devel libnetfilter_conntrack-devel pam-devel
- libcap-devel libltdl-devel libxml2-devel"
+ libcap-devel libltdl-devel libxml2-devel libxcrypt-devel"
 depends="perl"
 checkdepends="libcppunit-devel"
 short_desc="Caching proxy for the Web"
