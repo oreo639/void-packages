@@ -1,12 +1,12 @@
 # Template file for 'txr'
 pkgname=txr
 version=282
-revision=1
+revision=2
 archs="x86_64* i686* aarch64* arm* ppc64* mips*"
 build_style=configure
 configure_args="--prefix=/usr"
 make_check_target=tests
-makedepends="libffi-devel"
+makedepends="libffi-devel libxcrypt-devel"
 short_desc="Programming language for convenient data munging"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="BSD-2-Clause"
