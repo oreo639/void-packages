@@ -1,7 +1,7 @@
 # Template file for 'opensmtpd'
 pkgname=opensmtpd
 version=7.3.0p1
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="--sysconfdir=/etc/smtpd --sbindir=/usr/bin
  --with-path-socket=/run --with-path-pidfile=/run
@@ -14,7 +14,8 @@ configure_args="--sysconfdir=/etc/smtpd --sbindir=/usr/bin
  ac_cv_func_strlcat=no
  ac_cv_func_strlcpy=no"
 hostmakedepends="automake libtool pkg-config bison"
-makedepends="zlib-devel openssl-devel libevent-devel db-devel pam-devel"
+makedepends="zlib-devel openssl-devel libevent-devel db-devel pam-devel
+ libxcrypt-devel"
 depends="ca-certificates"
 conf_files="/etc/smtpd/smtpd.conf /etc/smtpd/aliases"
 short_desc="Free implementation of the server-side SMTP protocol"
