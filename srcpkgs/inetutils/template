@@ -1,10 +1,10 @@
 # Template file for 'inetutils'
 pkgname=inetutils
 version=2.4
-revision=1
+revision=2
 build_style=gnu-configure
 configure_args="--without-wrap --with-pam"
-makedepends="pam-devel readline-devel"
+makedepends="pam-devel readline-devel libxcrypt-devel"
 checkdepends="iana-etc net-tools"
 short_desc="GNU network utilities"
 maintainer="Orphaned <orphan@voidlinux.org>"
