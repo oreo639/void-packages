@@ -1,12 +1,13 @@
 # Template file for 'clisp'
 pkgname=clisp
 version=2.49.92
-revision=1
+revision=2
 build_style=configure
 configure_args="--prefix=/usr --disable-mmap --disable-rpath
  --without-dynamic-modules $(vopt_with readline)"
 hostmakedepends="ffcall"
-makedepends="libsigsegv-devel $(vopt_if readline readline-devel)"
+makedepends="libsigsegv-devel libxcrypt-devel
+ $(vopt_if readline readline-devel)"
 short_desc="ANSI Common Lisp Interpreter, Compiler and Debugger"
 maintainer="Martin Riese <grauehaare@gmx.de>"
 license="GPL-2.0-only"
