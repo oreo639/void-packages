@@ -1,10 +1,10 @@
 # Template file for 'wvstreams'
 pkgname=wvstreams
 version=4.6.1
-revision=22
+revision=23
 build_style=gnu-configure
 configure_args="--without-dbus --without-tcl --without-qt"
-makedepends="openssl-devel zlib-devel"
+makedepends="openssl-devel zlib-devel libxcrypt-devel"
 short_desc="Library for doing network in C++"
 maintainer="Enno Boland <gottox@voidlinux.org>"
 license="LGPL-2.0-only"
