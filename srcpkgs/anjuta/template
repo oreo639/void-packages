@@ -1,7 +1,7 @@
 # Template file for 'anjuta'
 pkgname=anjuta
 version=3.34.0
-revision=4
+revision=5
 build_style=gnu-configure
 build_helper="gir qemu"
 configure_args="--disable-compile-warnings --disable-schemas-compile
@@ -9,7 +9,7 @@ configure_args="--disable-compile-warnings --disable-schemas-compile
  SVN_INCLUDES=$XBPS_CROSS_BASE/usr/include SVN_LIBS=$XBPS_CROSS_BASE/usr/lib
  $(vopt_enable gir introspection)"
 hostmakedepends="pkg-config intltool flex itstool python3 autogen glib-devel
- libtool automake gettext-devel yelp-tools gtk-doc
+ libtool automake gettext-devel yelp-tools gtk-doc libxcrypt-devel
  vala-devel $(vopt_if gir gobject-introspection)"
 makedepends="gtksourceview-devel libxml2-devel vte3-devel gjs-devel
  libxslt-devel glade3-devel graphviz-devel vala-devel
