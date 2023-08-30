@@ -1,11 +1,11 @@
 # Template file for 'vile'
 pkgname=vile
 version=9.8x
-revision=1
+revision=2
 build_style=gnu-configure
 configure_args="--disable-stripping"
 hostmakedepends="flex"
-makedepends="ncurses-devel"
+makedepends="ncurses-devel libxcrypt-devel"
 short_desc="Text editor which is extremely compatible with vi like emacs"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="GPL-2.0-only"
