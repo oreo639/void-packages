@@ -1,10 +1,10 @@
 # Template file for 'FreeRADIUS'
 pkgname=FreeRADIUS
 version=3.0.26
-revision=2
+revision=3
 build_style=gnu-configure
 makedepends="talloc-devel openssl-devel mit-krb5-devel pam-devel \
- libmariadbclient-devel postgresql-libs-devel json-c-devel"
+ libmariadbclient-devel postgresql-libs-devel json-c-devel libxcrypt-devel"
 short_desc="World's most popular RADIUS Server"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="GPL-2.0-only"
