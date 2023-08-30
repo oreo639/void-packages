@@ -1,10 +1,10 @@
 # Template file for 'mokutil'
 pkgname=mokutil
 version=0.6.0
-revision=2
+revision=3
 build_style=gnu-configure
 hostmakedepends="autoconf automake pkg-config"
-makedepends="keyutils-devel libefivar-devel openssl-devel"
+makedepends="keyutils-devel libefivar-devel openssl-devel libxcrypt-devel"
 short_desc="Utility to manipulate machine owner keys"
 maintainer="Duncaen <duncaen@voidlinux.org>"
 license="GPL-3.0-or-later"
