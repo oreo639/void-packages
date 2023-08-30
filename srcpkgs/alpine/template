@@ -1,7 +1,7 @@
 # Template file for 'alpine'
 pkgname=alpine
 version=2.26
-revision=2
+revision=3
 _githash=9726c098a739edfdca6218bc5dee104c310957e9
 _gitshort="${_githash:0:7}"
 build_style=gnu-configure
@@ -10,7 +10,7 @@ configure_args="--with-passfile=.pine-passfile --without-tcl --disable-shared
  --with-system-pinerc=/etc/${pkgname}.d/pine.conf
  --with-system-fixed-pinerc=/etc/${pkgname}.d/pine.conf.fixed"
 hostmakedepends="hunspell"
-makedepends="gettext-devel libldap-devel mit-krb5-devel ncurses-devel"
+makedepends="gettext-devel libldap-devel mit-krb5-devel ncurses-devel libxcrypt-devel"
 short_desc="Apache-licensed PINE mail user agent (with Chappa patches)"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
 license="Apache-2.0"
