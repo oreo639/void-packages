@@ -1,10 +1,10 @@
 # Template file for 'Gauche'
 pkgname=Gauche
 version=0.9.12
-revision=1
+revision=2
 build_style=gnu-configure
 hostmakedepends="texinfo"
-makedepends="libticonv-devel libatomic_ops-devel"
+makedepends="libticonv-devel libatomic_ops-devel libxcrypt-devel"
 checkdepends="iana-etc"
 short_desc="Practical Scheme R7RS implementation"
 maintainer="rc-05 <rc23@email.it>"
