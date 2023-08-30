@@ -1,10 +1,10 @@
 # Template file for 'xlockmore'
 pkgname=xlockmore
 version=5.72
-revision=1
+revision=2
 build_style=gnu-configure
 configure_args="--with-xinerama $(vopt_if opengl '--with-opengl --with-mesa')"
-hostmakedepends="pkg-config"
+hostmakedepends="pkg-config libxcrypt-devel"
 makedepends="freetype-devel libXt-devel libXext-devel libXinerama-devel
  $(vopt_if opengl 'MesaLib-devel glu-devel')"
 short_desc="Provides the 'xlock' X screen locker"
