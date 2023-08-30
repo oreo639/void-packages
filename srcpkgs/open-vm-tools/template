@@ -1,7 +1,7 @@
 # Template file for 'open-vm-tools'
 pkgname=open-vm-tools
 version=12.2.5
-revision=1
+revision=2
 archs="x86_64* i686* aarch64*"
 build_wrksrc="open-vm-tools"
 build_style=gnu-configure
@@ -10,7 +10,7 @@ configure_args="--sbindir=/usr/bin --with-udev-rules-dir=/usr/lib/udev/rules.d
  $(vopt_with x11 x) $(vopt_with pam)"
 hostmakedepends="automake libtool pkg-config glib-devel rpcsvc-proto"
 makedepends="fuse-devel glib-devel libmspack-devel openssl-devel libtirpc-devel
- libxerces-c-devel $(vopt_if pam 'pam-devel')
+ libxerces-c-devel libxcrypt-devel $(vopt_if pam 'pam-devel')
  $(vopt_if x11 'gdk-pixbuf-xlib-devel gtkmm-devel libXtst-devel xmlsec1-devel')"
 short_desc="Open source implementation of VMware Tools"
 maintainer="Piraty <mail@piraty.dev>"
