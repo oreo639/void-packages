@@ -1,8 +1,9 @@
 # Template file for 'thttpd'
 pkgname=thttpd
 version=2.29
-revision=2
+revision=3
 build_style=gnu-configure
+makedepends="libxcrypt-devel"
 short_desc="Tiny/turbo/throttling HTTP server"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="BSD-2-Clause"
