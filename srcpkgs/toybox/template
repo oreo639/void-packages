@@ -1,8 +1,9 @@
 # Template file for 'toybox'
 pkgname=toybox
 version=0.8.9
-revision=1
+revision=2
 create_wrksrc=yes
+makedepends="libxcrypt-devel"
 short_desc="BSD-licensed alternative to busybox"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="0BSD"
