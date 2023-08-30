@@ -2,7 +2,7 @@
 # revbump dovecot-plugin-pigeonhole when updating dovecot!
 pkgname=dovecot
 version=2.3.20
-revision=3
+revision=4
 build_style=gnu-configure
 configure_args="--with-moduledir=/usr/lib/dovecot/modules --with-sql=plugin
  --disable-static --with-pam --with-mysql --with-pgsql --with-lucene
@@ -13,7 +13,7 @@ hostmakedepends="pkg-config perl"
 makedepends=" liblz4-devel zlib-devel bzip2-devel liblzma-devel openssl-devel
  mit-krb5-devel libmariadbclient-devel postgresql-libs-devel sqlite-devel
  clucene-devel libldap-devel libcap-devel pam-devel libcurl-devel expat-devel
- libsodium-devel"
+ libsodium-devel libxcrypt-devel"
 short_desc="IMAP and POP3 server written with security primarily in mind"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
 license="LGPL-2.1-or-later"
