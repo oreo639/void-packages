@@ -1,7 +1,7 @@
 # Template file for 'frr'
 pkgname=frr
 version=7.5
-revision=4
+revision=5
 build_style=gnu-configure
 # chroot-texinfo is not able to build frr's docs
 configure_args="--disable-doc
@@ -14,7 +14,7 @@ make_dirs="/var/log/frr 0700 _frr _frr"
 hostmakedepends="pkg-config flex bison autoconf automake libtool
  python3 python3-Sphinx python3-devel libyang-tools"
 makedepends="pcre-devel libcap-devel json-c-devel pam-devel c-ares-devel
- readline-devel python3-devel libyang-devel"
+ readline-devel python3-devel libyang-devel libxcrypt-devel"
 checkdepends="python3-pytest"
 short_desc="IP routing protocol suite"
 maintainer="Cameron Nemo <cam@nohom.org>"
