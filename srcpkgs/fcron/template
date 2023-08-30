@@ -1,7 +1,7 @@
 # Template file for 'fcron'
 pkgname=fcron
 version=3.3.1
-revision=1
+revision=2
 build_style=gnu-configure
 configure_args="
 	--sysconfdir=/etc/fcron
@@ -23,7 +23,7 @@ make_dirs="
 	/etc/cron.monthly 0755 root root
 	/etc/cron.weekly 0755 root root"
 hostmakedepends="autoconf perl"
-makedepends="pam-devel readline-devel"
+makedepends="pam-devel readline-devel libxcrypt-devel"
 depends="run-parts"
 short_desc="Feature-rich cron implementation"
 maintainer="Andrea Brancaleoni <abc@pompel.me>"
