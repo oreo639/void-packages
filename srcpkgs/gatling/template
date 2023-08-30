@@ -1,11 +1,11 @@
 # Template file for 'gatling'
 pkgname=gatling
 version=0.16
-revision=2
+revision=3
 build_style=gnu-makefile
 make_build_target="gatling dl getlinks"
 make_install_args="MANDIR=/usr/share/man"
-makedepends="libowfat openssl-devel zlib-devel"
+makedepends="libowfat openssl-devel zlib-devel libxcrypt-devel"
 short_desc="High performance web server"
 maintainer="Enno Boland <gottox@voidlinux.org>"
 license="GPL-2.0-only"
