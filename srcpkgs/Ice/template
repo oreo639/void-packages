@@ -1,13 +1,13 @@
 # Template file for 'Ice'
 pkgname=Ice
 version=3.7.8
-revision=2
+revision=3
 build_style=gnu-makefile
 make_build_args="LANGUAGES=cpp OPTIMIZE=yes USR_DIR_INSTALL=yes CONFIGS=shared
  CONFIGS+=cpp11-shared"
 make_install_args="LANGUAGES=cpp lib-suffix="
 makedepends="zlib-devel bzip2-devel zeroc-mcpp db-devel expat-devel
- openssl-devel lmdb-devel editline-devel"
+ openssl-devel lmdb-devel editline-devel libxcrypt-devel"
 short_desc="Internet Communications Engine (Ice)"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="GPL-2.0-only, custom:ICE"
