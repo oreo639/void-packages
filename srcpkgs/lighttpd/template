@@ -1,7 +1,7 @@
 # Template file for 'lighttpd'
 pkgname=lighttpd
 version=1.4.71
-revision=2
+revision=3
 build_style=meson
 configure_args="-Dwith_brotli=disabled -Dwith_bzip=disabled
  -Dwith_krb5=enabled -Dwith_ldap=enabled
@@ -12,7 +12,7 @@ configure_args="-Dwith_brotli=disabled -Dwith_bzip=disabled
  -Dwith_xattr=true -Dwith_zlib=enabled -Dwith_zstd=disabled -Dwith_dbi=disabled
  -Dmoduledir=lib/lighttpd/modules"
 hostmakedepends="pkg-config"
-makedepends="
+makedepends="libxcrypt-devel
  libxml2-devel lua53-devel mit-krb5-devel pcre2-devel sqlite-devel"
 checkdepends="perl"
 short_desc="Secure, fast, compliant and very flexible web-server"
