@@ -1,9 +1,9 @@
 # Template file for 'otpw'
 pkgname=otpw
 version=1.5
-revision=5
+revision=6
 conf_files="/etc/pam.d/ssh-otpw"
-makedepends="pam-devel"
+makedepends="pam-devel libxcrypt-devel"
 short_desc="A one-time password login package"
 maintainer="Duncan Overbruck <mail@duncano.de>"
 license="GPL-3"
