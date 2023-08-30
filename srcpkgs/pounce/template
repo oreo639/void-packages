@@ -1,12 +1,12 @@
 # Template file for 'pounce'
 pkgname=pounce
 version=3.1
-revision=1
+revision=2
 build_style=gnu-configure
 configure_args="--enable-notify --enable-palaver"
 make_build_target="all"
 hostmakedepends="pkg-config"
-makedepends="libtls-devel libcurl-devel sqlite-devel"
+makedepends="libtls-devel libcurl-devel sqlite-devel libxcrypt-devel"
 depends="openssl"
 short_desc="Multi-client, TLS-only IRC bouncer"
 maintainer="Orphaned <orphan@voidlinux.org>"
