@@ -1,9 +1,9 @@
 # Template file for 'slock'
 pkgname=slock
 version=1.5
-revision=1
+revision=2
 hostmakedepends="pkg-config"
-makedepends="libXrandr-devel"
+makedepends="libXrandr-devel libxcrypt-devel"
 short_desc="Simple screen locker for X"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="MIT"
