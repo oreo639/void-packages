@@ -1,7 +1,7 @@
 # Template file for 'apr-util'
 pkgname=apr-util
 version=1.6.3
-revision=2
+revision=3
 build_style=gnu-configure
 configure_args="
  --with-pgsql --with-ldap --with-apr=${XBPS_CROSS_BASE}/usr
@@ -12,7 +12,7 @@ configure_args="
 hostmakedepends="libtool apr-devel automake"
 makedepends="zlib-devel openssl-devel apr-devel db-devel expat-devel
  gdbm-devel libldap-devel libmariadbclient-devel unixodbc-devel
- postgresql-libs-devel sqlite-devel"
+ postgresql-libs-devel sqlite-devel libxcrypt-devel"
 short_desc="Apache Portable Runtime Utility Library"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="Apache-2.0"
