@@ -1,11 +1,11 @@
 # Template file for 'passwdqc'
 pkgname=passwdqc
 version=2.0.3
-revision=1
+revision=2
 build_style=gnu-makefile
 make_install_args="SHARED_LIBDIR=/usr/lib SECUREDIR=/usr/lib/security"
 conf_files="/etc/passwdqc.conf"
-makedepends="pam-devel"
+makedepends="pam-devel libxcrypt-devel"
 short_desc="Password strength checking and policy enforcement toolset"
 maintainer="Leah Neukirchen <leah@vuxu.org>"
 license="BSD-3-Clause,0BSD"
