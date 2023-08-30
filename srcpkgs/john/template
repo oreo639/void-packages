@@ -1,12 +1,13 @@
 # Template file for 'john'
 pkgname=john
 version=1.9.0
-revision=6
+revision=7
 _jumbover=1
 build_wrksrc="src"
 build_style=gnu-configure
 configure_args="--with-systemwide $(vopt_enable simd)"
-makedepends="openssl-devel gmp-devel libgomp-devel libpcap-devel bzip2-devel zlib-devel"
+makedepends="openssl-devel gmp-devel libgomp-devel libpcap-devel bzip2-devel
+ zlib-devel libxcrypt-devel"
 short_desc="John the Ripper password cracker (jumbo-${_jumbover} patch included)"
 maintainer="Piraty <mail@piraty.dev>"
 license="custom:GPL-2.0-or-later with OpenSSL-exception"
