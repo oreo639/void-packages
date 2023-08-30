@@ -2,8 +2,9 @@
 pkgname=libcli
 version=1.9.8.4
 _distver="${version%.*}-${version##*.}"
-revision=1
+revision=2
 build_style=gnu-makefile
+makedepends="libxcrypt-devel"
 short_desc="Library for cisco style telnet interfaces"
 maintainer="Robert Lowry <bobertlo@gmail.com>"
 license="GPL-2.0-or-later"
