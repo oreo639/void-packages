@@ -1,7 +1,7 @@
 # Template file for 'root'
 pkgname=root
 version=6.28.04
-revision=2
+revision=3
 # Only i686 and x86_64 seem to be officially supported
 archs="i686* x86_64*"
 build_style=cmake
@@ -20,7 +20,7 @@ makedepends="libX11-devel libXpm-devel libXft-devel libXext-devel
  openssl-devel libpng-devel readline-devel tbb-devel liblz4-devel
  pcre-devel xxHash-devel libzstd-devel liblzma-devel libvdt-devel
  libxml2-devel python3-devel python3-numpy R-cran-Rcpp R-cran-RInside
- xrootd gtest-devel"
+ xrootd gtest-devel libxcrypt-devel"
 depends="gcc"
 short_desc="C++ framework for data processing created by CERN"
 maintainer="Ben Jargowsky <benjar63@gmail.com>"
