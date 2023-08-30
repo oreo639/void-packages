@@ -1,8 +1,9 @@
 # Template file for 'ccrypt'
 pkgname=ccrypt
 version=1.11
-revision=1
+revision=2
 build_style=gnu-configure
+makedepends="libxcrypt-devel"
 short_desc="Symmetric encryption utility using Rijndael cipher"
 maintainer="Evan Deaubl <evan@deaubl.name>"
 license="GPL-2.0-or-later"
