@@ -4,7 +4,7 @@
 # See comments in mime-types template
 pkgname=nginx
 version=1.24.0
-revision=2
+revision=3
 _tests_commit=36a4563f7f00
 _njs_version=0.7.12
 create_wrksrc=yes
@@ -53,7 +53,7 @@ configure_args="--prefix=${_cfgdir}
  --with-threads
  --add-dynamic-module=../njs-${_njs_version}/nginx"
 hostmakedepends="geoip geoip-devel openssl-devel pcre2-devel perl libxslt-devel
- which"
+ which libxcrypt-devel"
 makedepends="${hostmakedepends}"
 checkdepends="perl perl-IO-Socket-SSL perl-GD perl-FCGI which uwsgi uwsgi-python3"
 short_desc="High performance web and reverse proxy server"
