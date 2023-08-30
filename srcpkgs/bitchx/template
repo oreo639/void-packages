@@ -1,10 +1,10 @@
 # Template file for 'bitchx'
 pkgname=bitchx
 version=1.2.1
-revision=18
+revision=19
 build_style=gnu-configure
 configure_args="--with-ssl --with-ipv6 --with-plugins"
-makedepends="openssl-devel ncurses-devel"
+makedepends="openssl-devel ncurses-devel libxcrypt-devel"
 short_desc="Simple IRC client (Internet Relay Chat)"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="BSD-3-Clause"
