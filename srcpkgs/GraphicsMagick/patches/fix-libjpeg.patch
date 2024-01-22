@@ -1,0 +1,24 @@
+Fix build with latest libjpeg-turbo
+
+See: https://github.com/ImageMagick/ImageMagick/commit/1175c9c3197cfcd21970772a62b1a6135c8d68f0
+
+--- a/coders/jpeg.c
++++ b/coders/jpeg.c
+@@ -1461,7 +1461,7 @@ static Image *ReadJPEGImage(const ImageI
+     }
+ #endif
+ #if (JPEG_LIB_VERSION >= 61) && defined(D_PROGRESSIVE_SUPPORTED)
+-#ifdef D_LOSSLESS_SUPPORTED
++#if !defined(LIBJPEG_TURBO_VERSION_NUMBER) && defined(D_LOSSLESS_SUPPORTED)
+   image->interlace=
+     jpeg_info.process == JPROC_PROGRESSIVE ? LineInterlace : NoInterlace;
+   image->compression=jpeg_info.process == JPROC_LOSSLESS ?
+@@ -2896,7 +2896,7 @@ static MagickPassFail WriteJPEGImage(con
+   if ((image->compression == LosslessJPEGCompression) ||
+       (quality > 100))
+     {
+-#if defined(C_LOSSLESS_SUPPORTED)
++#if !defined(LIBJPEG_TURBO_VERSION_NUMBER) && defined(C_LOSSLESS_SUPPORTED)
+       if (quality < 100)
+         ThrowException(&image->exception,CoderWarning,
+                        LosslessToLossyJPEGConversion,(char *) NULL);
