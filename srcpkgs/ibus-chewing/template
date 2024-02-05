@@ -1,0 +1,18 @@
+# Template file for 'ibus-chewing'
+pkgname=ibus-chewing
+version=1.6.2
+revision=1
+build_style=cmake
+build_helper=qemu
+configure_args="-DLIBEXEC_DIR='/usr/libexec'"
+hostmakedepends="pkg-config gettext glib"
+makedepends="ibus-devel glib-devel gtk+3-devel libchewing-devel libX11-devel"
+depends="libchewing ibus"
+short_desc="Chewing input method for IBus"
+maintainer="CToID <funk443@yandex.com>"
+license="GPL-2.0-or-later"
+homepage="https://github.com/chewing/ibus-chewing"
+distfiles="https://github.com/chewing/ibus-chewing/archive/1de53bf1c108e4c0ec173fd589b9deea82bc6079.tar.gz"
+checksum="e6cd1b436375f390621b2c1b4e915fe276408e9f39e2f133e4ab26549ecb672b"
+# The package needs to be installed to pass the test.
+make_check=no

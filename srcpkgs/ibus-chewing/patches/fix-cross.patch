@@ -1,0 +1,25 @@
+diff -rup src/CMakeLists.txt.orig src/CMakeLists.txt
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -91,12 +91,15 @@ if(GSETTINGS_SUPPORT)
+ 	    DESTINATION ${GSETTINGS_SCHEMAS_DIR}
+ 	)
+ 
+-    add_custom_target(schemas_gsettings ALL
+-        COMMAND G_MESSAGES_DEBUG=all "${CMAKE_CURRENT_BINARY_DIR}/generate-gsettings-schemas" -v 5 "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_GSCHEMA_XML}"
+-        COMMAND G_MESSAGES_DEBUG=all glib-compile-schemas "${CMAKE_CURRENT_BINARY_DIR}"
+-        COMMENT "Generating gsettings schemas ${PROJECT_GSCHEMA_XML}"
+-        VERBATIM
+-	)
++    add_custom_command(
++        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_GSCHEMA_XML}
++        COMMAND generate-gsettings-schemas -v 5 "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_GSCHEMA_XML}"
++        COMMAND G_MESSAGES_DEBUG=all glib-compile-schemas ${CMAKE_CURRENT_BINARY_DIR}
++        DEPENDS generate-gsettings-schemas
++        WORKING_DIRECTORY ${DATA_BIN_DIR}
++        )
++
++    add_custom_target(schemas_gsettings ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_GSCHEMA_XML})
+ 
+     add_dependencies(schemas_gsettings generate-gsettings-schemas)
+ endif()
