@@ -1,57 +1,67 @@
 # Template file for 'ghc'
 pkgname=ghc
 # Keep this synchronized with http://www.stackage.org/lts
-version=9.0.2
-revision=2
+version=9.8.4
+revision=1
 build_style=gnu-configure
-hostmakedepends="automake docbook-xsl ghc-bin libxslt libnuma-devel
- ncurses-devel python3-Sphinx python3-setuptools"
+hostmakedepends="automake docbook-xsl libxslt libnuma-devel
+ ncurses-devel python3-Sphinx python3-setuptools tar xz"
 makedepends="libnuma-devel"
 depends="perl gcc libffi-devel gmp-devel libnuma-devel"
 short_desc="Glorious Haskell Compiler"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="BSD-3-Clause"
-homepage="http://www.haskell.org/ghc/"
-distfiles="http://www.haskell.org/ghc/dist/${version%[!0-9]}/${pkgname}-${version%[!0-9]}-src.tar.xz"
-checksum=140e42b96346322d1a39eb17602bcdc76e292028ad4a69286b230bab188a9197
-nocross=yes # this is conditionally unset for cross bindist
+homepage="https://www.haskell.org/ghc/"
+distfiles="https://downloads.haskell.org/~ghc/${version}/ghc-${version}-src.tar.xz"
+checksum="17e8188f3c8a5c2f73fb4e35d01032e8dc258835ec876d52c8ad8ee3d24b2fc5"
+make_build_args="--docs=no-sphinx-pdfs"
+make_install_args="RECACHE_PACKAGE_DB=NO"
 nodebug=yes # work around assembler error "Fatal error: duplicate .debug_line sections"
-_bindir="/usr/lib/${pkgname}-${version}/bin"
+_bindir="/usr/lib/ghc-${version}/bin"
 nopie_files="
- ${_bindir}/ghc
- ${_bindir}/ghc-iserv
- ${_bindir}/ghc-iserv-dyn
- ${_bindir}/ghc-iserv-prof
- ${_bindir}/ghc-pkg
- ${_bindir}/haddock
- ${_bindir}/hp2ps
- ${_bindir}/hpc
- ${_bindir}/hsc2hs
- ${_bindir}/runghc
- ${_bindir}/unlit
+ ${_bindir}/ghc-${version}
+ ${_bindir}/ghc-iserv-ghc-${version}
+ ${_bindir}/ghc-iserv-dyn-ghc-${version}
+ ${_bindir}/ghc-iserv-prof-ghc-${version}
+ ${_bindir}/ghc-pkg-${version}
+ ${_bindir}/ghci-${version}
+ ${_bindir}/haddock-ghc-${version}
+ ${_bindir}/hp2ps-ghc-${version}
+ ${_bindir}/hpc-ghc-${version}
+ ${_bindir}/hsc2hs-ghc-${version}
+ ${_bindir}/runghc-${version}
+ ${_bindir}/unlit-ghc-${version}
+ /usr/lib/ghc-${version}/lib/bin/unlit
+ /usr/lib/ghc-${version}/lib/bin/ghc-iserv
+ /usr/lib/ghc-${version}/lib/bin/ghc-iserv-dyn
+ /usr/lib/ghc-${version}/lib/bin/ghc-iserv-prof
 "
 
 build_options="bindist"
 desc_option_bindist="Create a binary distribution"
 
-# it is not possible to cross-compile an entire ghc distribution as
-# some components rely on stage2 binaries being runnable on the host
-# even cross-compiled bindists are incomplete, and you should only
-# use them to compile proper bindists on newly bootstrapped targets
+nocross=yes # Connot create native ghc for different architecture: https://gitlab.haskell.org/ghc/ghc/-/merge_requests/11444
+
 if [ -z "$build_option_bindist" ]; then
 	# final package builds use system libffi as well as gmp and ncurses
-	configure_args=" --with-system-libffi"
+	configure_args+=" --with-system-libffi"
 	makedepends+=" libffi-devel ncurses-devel gmp-devel"
-elif [ -z "$CROSS_BUILD" ]; then
-	# native bindist builds use gmp and ncurses, but builtin libffi
-	makedepends+=" ncurses-devel gmp-devel"
-elif [ "${XBPS_MACHINE%-*}" != "${XBPS_TARGET_MACHINE%-*}" ]; then
-	# ghc's cross mode only works when the actual target arch differs
-	# i.e. cross-compiling to same arch but different libc does not work
-	unset nocross
+fi
+
+if [ "$CROSS_BUILD" ]; then
+	if [ "${XBPS_LIBC}" != "${XBPS_TARGET_LIBC}" ]; then
+		broken="cross-compiling to same arch but different libc does not work"
+	fi
+
 	# host must equal build and target must be set when cross-compiling
 	configure_args+=" --host=${XBPS_TRIPLET} --target=${XBPS_CROSS_TRIPLET}"
+	hostmakedepends+=" ghc cabal-install"
+else
+	hostmakedepends+=" ghc-bootstrap"
 fi
+
+# native bindist builds use gmp and ncurses, but builtin libffi
+#makedepends+=" ncurses-devel gmp-devel"
 
 case "$XBPS_TARGET_MACHINE" in
 aarch64*)
@@ -75,6 +85,7 @@ if [ "$build_option_bindist" ]; then
 fi
 
 post_extract() {
+	vsed -e 's/LlvmMaxVersion=16/LlvmMaxVersion=18/g' -i configure.ac
 	[ "$build_option_bindist" ] || return 0
 
 	# update libffi for all bindists
@@ -118,8 +129,42 @@ pre_configure() {
 	autoreconf -fi
 }
 
+post_configure() {
+	if [ "$CROSS_BUILD" ]; then
+		(
+			cd hadrian
+			cp ${FILESDIR}/cabal.project.freeze .
+			HOME="$PWD" cabal v2-update
+			HOME="$PWD" cabal v2-build
+			mkdir -p ../_build/bin
+			for f in $(HOME="$PWD" cabal list-bin all); do
+				cp ${f} ../_build/bin/
+			done
+		)
+	else
+		./hadrian/bootstrap/bootstrap.py
+	fi
+}
+
+do_build() {
+	./_build/bin/hadrian ${makejobs} ${make_build_args}
+}
+
+pre_install() {
+	./_build/bin/hadrian ${makejobs} ${make_build_args} binary-dist-dir
+	cd _build/bindist/ghc-*
+	# Need to re-run configure
+	# https://gitlab.haskell.org/ghc/ghc/-/issues/22058
+	./configure --prefix=/usr ${configure_args}
+}
+
+do_install() {
+	cd _build/bindist/ghc-*
+	make DESTDIR=${DESTDIR} ${make_install_args} install
+}
+
 post_install() {
-	sed -i 's#/usr/lib/ccache/bin/##g' ${DESTDIR}/usr/lib/ghc-${version%[!0-9]}/settings
+	sed -i 's#/usr/lib/ccache/bin/##g' ${DESTDIR}/usr/lib/ghc-${version}/lib/settings
 	vlicense LICENSE
 
 	local arch dest
@@ -136,7 +181,7 @@ post_install() {
 
 	if [ "$build_option_bindist" ]; then
 		msg_normal "Creating binary distribution for ${XBPS_TARGET_MACHINE}...\n"
-		make ${makejobs} binary-dist
+		./_build/bin/hadrian ${makejobs} ${make_build_args} binary-dist
 		mkdir -p ${XBPS_SRCDISTDIR}/distfiles
 		mv ghc-${version}-${arch}-unknown-linux.tar.xz ${dest}
 		install -m 0644 ${dest} ${XBPS_SRCDISTDIR}/distfiles
