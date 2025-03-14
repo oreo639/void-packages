@@ -1,8 +1,10 @@
 # Template file for 'cabal-install'
 pkgname=cabal-install
-version=3.6.3.0
-revision=2
-hostmakedepends="ghc curl tar which"
+version=3.10.3.0
+revision=1
+# Ensure ofd-locking is disabled: https://github.com/haskell/cabal/issues/7313
+_cabal_args="--prefix=/usr --constraint 'lukko -ofd-locking'"
+hostmakedepends="ghc curl tar which cabal-bootstrap"
 makedepends="gmp-devel libffi-devel zlib-devel python3"
 depends="ghc"
 short_desc="Command-line interface for Cabal and Hackage"
@@ -10,28 +12,45 @@ maintainer="Orphaned <orphan@voidlinux.org>"
 license="BSD-3-Clause"
 homepage="https://hackage.haskell.org/package/cabal-install"
 distfiles="https://github.com/haskell/cabal/archive/Cabal-v${version}.tar.gz"
-checksum=dea086acad6d9fe5fe22d838b95b4e988022e8519f38d41609119ea32bfb7466
+checksum=29d622886624f72f1c5be1fb385b1eb612a72e487c2c91ca8cbefb84abdbf352
 nopie_files="/usr/bin/cabal"
-nocross=yes
 
-post_extract() {
-	cp "${FILESDIR}/linux-9.0.2.json" bootstrap/
-}
+build_options="refreeze"
+desc_option_refreeze="Update cabal dependency freeze file"
 
 post_patch() {
-	case "${XBPS_TARGET_MACHINE}" in
-	i686*)
-		# https://github.com/haskell/cabal/issues/7313
-		vsed -i -e 's/+ofd-locking/-ofd-locking/' bootstrap/linux-9.0.2.json ;;
-	esac
+	# The central cabal.project file enables debug assertions for testing purposes, disable
+	vsed -e 's/-fno-ignore-asserts//g' -i cabal.project
+}
+
+pre_configure() {
+	if [ "$build_option_refreeze" ]; then
+		eval "__cabal_args=(${_cabal_args})"
+		echo "${__cabal_args[@]}"
+		HOME=$PWD cabal v2-update
+		(
+			# Ensure constraints are synced with do_build()
+			HOME=$PWD cabal v2-freeze \
+				--shadow-installed-packages "${__cabal_args[@]}"
+			mv cabal.project.freeze "$FILESDIR"
+		)
+	fi
+
+	cp $FILESDIR/cabal.project.freeze .
 }
 
 do_build() {
-	PREFIX=$PWD bootstrap/bootstrap.py -d bootstrap/linux-9.0.2.json
+	eval "__cabal_args=(${_cabal_args})"
+	HOME=$PWD cabal v2-update
+	HOME=$PWD cabal v2-build cabal-install:exes ${makejobs} "${__cabal_args[@]}"
 }
+
 do_install() {
-	vbin _build/bin/cabal
-	PREFIX=$PWD _build/bin/cabal man --raw > cabal.1
+	# https://github.com/haskell/cabal/issues/6919
+	for f in $(HOME="$PWD" cabal list-bin cabal-install:exes); do
+		vbin ${f}
+	done
+	PREFIX=$PWD ${DESTDIR}/usr/bin/cabal man --raw > cabal.1
 	vman cabal.1
 	vlicense LICENSE
 }
