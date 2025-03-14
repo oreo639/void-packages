@@ -1,0 +1,46 @@
+# Template file for 'cabal-bootstrap'
+pkgname=cabal-bootstrap
+version=3.10.3.0
+revision=1
+hostmakedepends="pkg-config curl tar which ghc-bootstrap"
+makedepends="gmp-devel libffi-devel zlib-devel python3"
+short_desc="Command-line interface for Cabal and Hackage"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="BSD-3-Clause"
+homepage="https://hackage.haskell.org/package/cabal-install"
+distfiles="https://github.com/haskell/cabal/archive/Cabal-v${version}.tar.gz"
+checksum=29d622886624f72f1c5be1fb385b1eb612a72e487c2c91ca8cbefb84abdbf352
+conflicts="cabal-install>=0"
+nopie_files="/usr/bin/cabal"
+repository=bootstrap
+nocross=yes
+
+post_extract() {
+	# Make sure the json file is in sync with ghc-bootstrap
+	# Generate the json file by running the following commands:
+	#   cabal --distdir=dist-bootstrap build --project-file=cabal.bootstrap.project --dry-run cabal-install:exe:cabal -w ${ghc_bin}/ghc
+	#   cp dist-bootstrap/cache/plan.json bootstrap/linux-${ghc_bootstrap_ver}.plan.json
+	#   cd bootstrap
+	#   cabal run -v0 cabal-bootstrap-gen -- linux-${ghc_bootstrap_ver}.plan.json | tee linux-${ghc_bootstrap_ver}.json
+
+	cp "${FILESDIR}/linux-9.8.2.json" bootstrap/
+}
+
+post_patch() {
+	case "${XBPS_TARGET_MACHINE}" in
+	i686*)
+		# https://github.com/haskell/cabal/issues/7313
+		vsed -i -e 's/+ofd-locking/-ofd-locking/' bootstrap/linux-9.8.2.json ;;
+	esac
+}
+
+do_build() {
+	PREFIX=$PWD bootstrap/bootstrap.py -d "$PWD/bootstrap/linux-9.8.2.json"
+}
+
+do_install() {
+	vbin _build/bin/cabal
+	PREFIX=$PWD _build/bin/cabal man --raw > cabal.1
+	vman cabal.1
+	vlicense LICENSE
+}
