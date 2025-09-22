@@ -1,7 +1,7 @@
 # Template file for 'xapps'
 pkgname=xapps
-version=2.8.7
-revision=3
+version=2.8.13
+revision=1
 build_style=meson
 build_helper="gir"
 hostmakedepends="glib-devel pkg-config vala python3 gettext"
@@ -15,7 +15,7 @@ license="GPL-3.0-or-later, LGPL-3.0-or-later"
 homepage="https://github.com/linuxmint/xapp"
 changelog="https://raw.githubusercontent.com/linuxmint/xapp/master/debian/changelog"
 distfiles="https://github.com/linuxmint/xapp/archive/${version}.tar.gz"
-checksum=95ad692de2f53bd12b8fd5fb7786ba197f830f982a73903c342c3a64bc6fb604
+checksum=5282727e41c0fe86b22b745b3abd134a67edd7fb9337deaff762376b1f49b140
 
 xapps-devel_package() {
 	short_desc+=" - development files"
