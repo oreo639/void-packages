@@ -1,7 +1,7 @@
 # Template file for 'gnome-shell'
 pkgname=gnome-shell
-version=48.5
-revision=2
+version=49.1
+revision=1
 build_style=meson
 build_helper=gir
 configure_args="-Dsystemd=false -Dtests=false"
@@ -20,10 +20,10 @@ short_desc="GNOME core user interface"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="GPL-2.0-or-later"
 homepage="https://wiki.gnome.org/Projects/GnomeShell"
-#changelog="https://gitlab.gnome.org/GNOME/gnome-shell/-/raw/main/NEWS"
-changelog="https://gitlab.gnome.org/GNOME/gnome-shell/-/raw/gnome-48/NEWS"
+changelog="https://gitlab.gnome.org/GNOME/gnome-shell/-/raw/main/NEWS"
+#changelog="https://gitlab.gnome.org/GNOME/gnome-shell/-/raw/gnome-49/NEWS"
 distfiles="${GNOME_SITE}/gnome-shell/${version%%.*}/gnome-shell-${version}.tar.xz"
-checksum=87270785b290c824312004c6651432d2c7288bd8403c17d8e06f007019604cdf
+checksum=b42d073189e400af94fc39daebabe5a367bb0f6cf784ec5ce951687595efbceb
 
 do_check() {
 	mkdir /tmp/gnome-shell-xdg
