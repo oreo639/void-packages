@@ -1,7 +1,7 @@
 # Template file for 'binutils'
 pkgname=binutils
-version=2.44
-revision=2
+version=2.45
+revision=1
 bootstrap=yes
 hostmakedepends="pkgconf tar"
 makedepends="zlib-devel libzstd-devel"
@@ -10,10 +10,17 @@ maintainer="Enno Boland <gottox@voidlinux.org>"
 license="GPL-3.0-or-later"
 homepage="http://www.gnu.org/software/binutils/"
 distfiles="${GNU_SITE}/binutils/binutils-${version}.tar.xz"
-checksum=ce2017e059d63e67ddb9240e9d4ec49c2893605035cd60e92ad53177f4377237
+checksum=c50c0e7f9cb188980e2cc97e4537626b1672441815587f1eab69d2a1bfbef5d2
 
 build_options="all_targets"
 desc_option_all_targets="Enable all supported targets"
+
+# Avoid situation where binutils-libs can depend on a libc version greater than has been built.
+case "$XBPS_TARGET_MACHINE" in
+	armv*-musl) makedepends+=" musl1.1-devel" ;;
+	*-musl)     makedepends+=" musl-devel" ;;
+	*) 	    makedepends+=" glibc-devel";;
+esac
 
 if [ "$CHROOT_READY" ]; then
 	hostmakedepends+=" flex perl texinfo"
@@ -103,6 +110,7 @@ do_configure() {
 		--sysconfdir=/etc \
 		--disable-werror \
 		--disable-nls \
+		--disable-default-execstack \
 		--enable-threads \
 		--enable-plugins \
 		--enable-relro \
