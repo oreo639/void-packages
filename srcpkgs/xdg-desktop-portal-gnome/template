@@ -1,6 +1,6 @@
 # Template file for 'xdg-desktop-portal-gnome'
 pkgname=xdg-desktop-portal-gnome
-version=48.0
+version=49.0
 revision=1
 build_style=meson
 configure_args="-Dsystemduserunitdir=/usr/lib/systemd/user"
@@ -14,8 +14,7 @@ short_desc="GNOME portal backend for xdg-desktop-portal"
 maintainer="oreo639 <oreo6391@gmail.com>"
 license="LGPL-2.1-or-later"
 homepage="https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome"
-changelog="https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/raw/main/NEWS"
-# FIXME: dead link
-changelog="https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/raw/gnome-48/NEWS"
+#changelog="https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/raw/main/NEWS"
+changelog="https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/raw/gnome-49/NEWS"
 distfiles="${GNOME_SITE}/xdg-desktop-portal-gnome/${version%.*}/xdg-desktop-portal-gnome-${version}.tar.xz"
-checksum=cd15aca2e1364da308eb3796bb8ae4a577e60ca4fe12006b315232cfd19c8861
+checksum=401dafcdf8cb911f09c08d2813f774dd864127abfca93ff4caf1fc4c9b5ec4d2
