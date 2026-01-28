@@ -1,6 +1,6 @@
 # Template file for 'libdisplay-info'
 pkgname=libdisplay-info
-version=0.3.0
+version=0.3.99
 revision=1
 build_style=meson
 hostmakedepends="hwids"
@@ -8,8 +8,8 @@ short_desc="EDID and DisplayID library"
 maintainer="John <me@johnnynator.dev>"
 license="MIT"
 homepage="https://gitlab.freedesktop.org/emersion/libdisplay-info/"
-distfiles="https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/${version}/libdisplay-info-${version}.tar.gz"
-checksum=2b467e3336aec63819d6aca28d7310d3dc7415b2b3a3c3a5aec9d3727053c078
+distfiles="https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/70855b14c1d2955910c47d1b7ffbe90457a6cbef/libdisplay-info-70855b14c1d2955910c47d1b7ffbe90457a6cbef.tar.gz"
+checksum=2fd9a6164764e615d938781e9f68263252c733b558bce1bbf9782626fd0d05b4
 # tests require currently unpacakged edid-decode
 make_check=no
 
