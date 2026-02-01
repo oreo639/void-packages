@@ -1,6 +1,6 @@
 # Template file for 'libdecor'
 pkgname=libdecor
-version=0.2.5
+version=0.2.99
 revision=1
 build_style=meson
 configure_args="-Ddemo=false $(vopt_feature dbus dbus)"
@@ -11,8 +11,8 @@ short_desc="Client-side decorations library for Wayland client"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="MIT"
 homepage="https://gitlab.freedesktop.org/libdecor/libdecor"
-distfiles="https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/${version}/libdecor-${version}.tar.gz"
-checksum=39c109a9a7eae943ba34d18a282c447d5729f9c486c8bc05ea305e4acd341522
+distfiles="https://gitlab.freedesktop.org/libdecor/libdecor/-/archive/73fc377e13834010178919b182e738ea53f15c10/libdecor-73fc377e13834010178919b182e738ea53f15c10.tar.gz"
+checksum=45381414a25fa71480b01e77dd9fbd076a8cc4088c27724051719ecb498b4a53
 
 build_options="dbus"
 build_options_default="dbus"
