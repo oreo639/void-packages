@@ -1,0 +1,6436 @@
+From a1527fc561cdb6abd04595465f60797c6b535d40 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 21:01:33 +0100
+Subject: [PATCH 01/20] plugins/cairo: Fix uninitialized variable warning
+
+---
+ src/plugins/cairo/libdecor-cairo.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/plugins/cairo/libdecor-cairo.c b/src/plugins/cairo/libdecor-cairo.c
+index d8854bc..df48fc7 100644
+--- a/src/plugins/cairo/libdecor-cairo.c
++++ b/src/plugins/cairo/libdecor-cairo.c
+@@ -1079,6 +1079,8 @@ calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
+ 
+ 	switch (component) {
+ 	case NONE:
++		*component_x = 0;
++		*component_y = 0;
+ 		*component_width = 0;
+ 		*component_height = 0;
+ 		return;
+-- 
+GitLab
+
+
+From 9dad7ad1bc1ae4f3a86b20f4829da71d0c4302d0 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 15:17:38 +0100
+Subject: [PATCH 02/20] ci: Update to F43 and include gtk4 devel packages
+
+---
+ .gitlab-ci.yml | 44 ++++++++++++++++++++++++++------------------
+ 1 file changed, 26 insertions(+), 18 deletions(-)
+
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+index 3818ee8..87ecfdc 100644
+--- a/.gitlab-ci.yml
++++ b/.gitlab-ci.yml
+@@ -1,26 +1,34 @@
++.templates_sha: &template_sha baa94a8f673dd1f11f81377106310752936d3672
++
+ include:
+-  - remote: 'https://gitlab.freedesktop.org/freedesktop/ci-templates/-/raw/3d03cccd770c04e63b40325b42223495274d6a1d/templates/fedora.yml'
++  - project: 'freedesktop/ci-templates'
++    ref: *template_sha
++    file: '/templates/fedora.yml'
+ 
+ stages:
+  - prepare
+  - build
+ 
+-.libdecor.fedora:34@common:
++.libdecor.fedora@common:
+   variables:
+-    FDO_DISTRIBUTION_VERSION: 34
+-    BASE_TAG: '2023-07-04.1'
++    FDO_DISTRIBUTION_VERSION: 43
++    BASE_TAG: '2026-03-27.0'
+     FDO_UPSTREAM_REPO: jadahl/libdecor
+-    FDO_DISTRIBUTION_PACKAGES: |
+-      pkgconfig(wayland-client) pkgconfig(dbus-1) pkgconfig(wayland-protocols)
+-      pkgconfig(cairo) pkgconfig(pangocairo)
+-      pkgconfig(wayland-cursor) pkgconfig(xkbcommon)
+-      pkgconfig(egl) pkgconfig(gl) pkgconfig(wayland-egl)
+-      pkgconfig(gtk+-3.0)
+-      meson
+     FDO_DISTRIBUTION_EXEC: |
+-      dnf group install -y 'Development Tools' \
+-                           'C Development Tools and Libraries' &&
+-      dnf install -y https://kojipkgs.fedoraproject.org//packages/wayland-protocols/1.43/1.fc41/noarch/wayland-protocols-devel-1.43-1.fc41.noarch.rpm &&
++      dnf group install -y development-tools c-development
++      dnf install -y 'pkgconfig(wayland-client)' \
++                     'pkgconfig(dbus-1)' \
++                     'pkgconfig(wayland-protocols)' \
++                     'pkgconfig(cairo)' \
++                     'pkgconfig(pangocairo)' \
++                     'pkgconfig(wayland-cursor)' \
++                     'pkgconfig(xkbcommon)' \
++                     'pkgconfig(egl)' \
++                     'pkgconfig(gl)' \
++                     'pkgconfig(wayland-egl)' \
++                     'pkgconfig(gtk+-3.0)' \
++                     'pkgconfig(gtk4)' \
++                     meson
+       dnf clean all
+ 
+ default:
+@@ -47,15 +55,15 @@ workflow:
+     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+     - when: 'manual'
+ 
+-.libdecor.fedora:34@x86_64:
+-  extends: .libdecor.fedora:34@common
++.libdecor.fedora@x86_64:
++  extends: .libdecor.fedora@common
+   variables:
+     FDO_DISTRIBUTION_TAG: "x86_64-${BASE_TAG}"
+ 
+ build-fedora-container@x86_64:
+   extends:
+     - .fdo.container-build@fedora@x86_64
+-    - .libdecor.fedora:34@x86_64
++    - .libdecor.fedora@x86_64
+   stage: prepare
+   variables:
+     GIT_STRATEGY: none
+@@ -73,6 +81,6 @@ build-fedora-container@x86_64:
+ build-libdecor@x86_64:
+   extends:
+     - .build-libdecor
+-    - .libdecor.fedora:34@x86_64
++    - .libdecor.fedora@x86_64
+   needs:
+     - build-fedora-container@x86_64
+-- 
+GitLab
+
+
+From 2ccb587d0681fbc73bea361918c33f3d2ebbf81d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 23 Mar 2026 10:29:28 +0100
+Subject: [PATCH 03/20] demo: Don't set window state too early
+
+The new window state is compared to the new one later, and then updated
+after that. Since we updated it too early, the following check never
+succeeded leading to the active state not being drawn unless something
+else also triggered a redraw.
+---
+ demo/demo.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/demo/demo.c b/demo/demo.c
+index 857f704..66216ac 100644
+--- a/demo/demo.c
++++ b/demo/demo.c
+@@ -1126,8 +1126,6 @@ handle_configure(struct libdecor_frame *frame,
+ 						     &window_state))
+ 		window_state = LIBDECOR_WINDOW_STATE_NONE;
+ 
+-	window->window_state = window_state;
+-
+ 	if (!libdecor_configuration_get_content_size(configuration, frame,
+ 						     &width, &height)) {
+ 		width = window->content_width;
+-- 
+GitLab
+
+
+From 50bd7362fbabae60bcea90d38f4ded1f574a6e9f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:12:14 +0100
+Subject: [PATCH 04/20] demo: Remove static window instance
+
+This will allow making the demo multi-window.
+---
+ demo/demo.c | 190 +++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 136 insertions(+), 54 deletions(-)
+
+diff --git a/demo/demo.c b/demo/demo.c
+index 66216ac..1250ace 100644
+--- a/demo/demo.c
++++ b/demo/demo.c
+@@ -75,7 +75,7 @@ static const size_t N_TITLES = ARRAY_SIZE(titles);
+ static bool
+ own_proxy(struct wl_proxy *proxy)
+ {
+-	return (wl_proxy_get_tag(proxy) == &proxy_tag);
++	return proxy && (wl_proxy_get_tag(proxy) == &proxy_tag);
+ }
+ 
+ static bool
+@@ -87,6 +87,15 @@ own_output(struct wl_output *output)
+ 	return own_proxy((struct wl_proxy *) output);
+ }
+ 
++static bool
++own_surface(struct wl_surface *surface)
++{
++	if (!surface)
++		return false;
++
++	return own_proxy((struct wl_proxy *) surface);
++}
++
+ struct buffer {
+ 	struct wl_buffer *wl_buffer;
+ 	void *data;
+@@ -103,6 +112,8 @@ struct popup {
+ };
+ 
+ struct window {
++	struct libdecor *context;
++	struct wl_list link;
+ 	struct wl_surface *wl_surface;
+ 	struct buffer *buffer;
+ 	struct libdecor_frame *frame;
+@@ -129,6 +140,7 @@ struct seat {
+ 	struct wl_cursor *left_ptr_cursor;
+ 	struct wl_surface *cursor_surface;
+ 	struct wl_surface *pointer_focus;
++	struct wl_surface *keyboard_focus;
+ 	int pointer_scale;
+ 	uint32_t serial;
+ 	wl_fixed_t pointer_sx;
+@@ -160,15 +172,19 @@ static struct wl_compositor *wl_compositor;
+ static struct wl_shm *wl_shm;
+ static struct xdg_wm_base *xdg_wm_base;
+ static struct wl_list seats;
++static struct wl_list windows;
+ static struct wl_list outputs;
+ 
+ static bool has_xrgb = false;
+ 
+-static struct window *window;
+-
+ static void
+ redraw(struct window *window);
+ 
++static struct window *
++window_new(struct libdecor *context);
++static void
++window_free(struct window *window);
++
+ static void
+ constrain_content_size(const struct libdecor_frame *frame,
+ 		       int *width,
+@@ -373,16 +389,16 @@ pointer_enter(void *data,
+ {
+ 	struct seat *seat = data;
+ 
+-	seat->pointer_focus = surface;
+-	seat->serial = serial;
+ 
+-	if (surface != window->wl_surface)
++	if (!own_surface(surface))
+ 		return;
+ 
+-	set_cursor(seat);
+-
++	seat->pointer_focus = surface;
++	seat->serial = serial;
+ 	seat->pointer_sx = surface_x;
+ 	seat->pointer_sy = surface_y;
++
++	set_cursor(seat);
+ }
+ 
+ static void
+@@ -410,7 +426,8 @@ pointer_motion(void *data,
+ }
+ 
+ static struct xdg_positioner *
+-create_positioner(struct seat *seat)
++create_positioner(struct seat *seat,
++		  struct window *window)
+ {
+ 	struct xdg_positioner *positioner;
+ 	enum xdg_positioner_constraint_adjustment constraint_adjustment;
+@@ -496,8 +513,9 @@ xdg_surface_configure(void *data,
+ 	}
+ 
+ 	wl_surface_attach(popup->wl_surface, buffer->wl_buffer, 0, 0);
+-	wl_surface_set_buffer_scale(window->wl_surface, window->scale);
+-	wl_surface_damage(window->wl_surface, 0, 0,
++	wl_surface_set_buffer_scale(popup->window->wl_surface,
++				    popup->window->scale);
++	wl_surface_damage(popup->window->wl_surface, 0, 0,
+ 			  POPUP_WIDTH, POPUP_HEIGHT);
+ 	xdg_surface_ack_configure(popup->xdg_surface, serial);
+ 	wl_surface_commit(popup->wl_surface);
+@@ -508,7 +526,8 @@ static const struct xdg_surface_listener xdg_surface_listener = {
+ };
+ 
+ static void
+-open_popup(struct seat *seat)
++open_popup(struct seat *seat,
++	   struct window *window)
+ {
+ 	struct popup *popup;
+ 	struct xdg_positioner *positioner;
+@@ -516,12 +535,13 @@ open_popup(struct seat *seat)
+ 	popup = zalloc(sizeof *popup);
+ 
+ 	popup->wl_surface = wl_compositor_create_surface(wl_compositor);
++	wl_proxy_set_tag((struct wl_proxy *) popup->wl_surface, &proxy_tag);
+ 	popup->xdg_surface = xdg_wm_base_get_xdg_surface (xdg_wm_base,
+ 							  popup->wl_surface);
+ 	popup->parent = libdecor_frame_get_xdg_surface(window->frame);
+ 	popup->window = window;
+ 	popup->seat = seat;
+-	positioner = create_positioner(seat);
++	positioner = create_positioner(seat, window);
+ 	popup->xdg_popup = xdg_surface_get_popup(popup->xdg_surface,
+ 						 popup->parent,
+ 						 positioner);
+@@ -559,10 +579,12 @@ pointer_button(void *data,
+ 	       uint32_t state)
+ {
+ 	struct seat *seat = data;
++	struct window *window;
+ 
+-	if (seat->pointer_focus != window->wl_surface)
++	if (!own_surface(seat->pointer_focus))
+ 		return;
+ 
++	window = wl_surface_get_user_data(seat->pointer_focus);
+ 	seat->serial = serial;
+ 
+ 	if (window->popup &&
+@@ -582,7 +604,7 @@ pointer_button(void *data,
+ 	} else if (button == BTN_RIGHT &&
+ 		   state == WL_POINTER_BUTTON_STATE_PRESSED) {
+ 		if (!window->popup)
+-			open_popup(seat);
++			open_popup(seat, window);
+ 	}
+ }
+ 
+@@ -646,6 +668,12 @@ keyboard_enter(void *data,
+ 	       struct wl_surface *surface,
+ 	       struct wl_array *keys)
+ {
++	struct seat *seat = data;
++
++	if (!own_surface(surface))
++		return;
++
++	seat->keyboard_focus = surface;
+ }
+ 
+ static void
+@@ -654,6 +682,9 @@ keyboard_leave(void *data,
+ 	       uint32_t serial,
+ 	       struct wl_surface *surface)
+ {
++	struct seat *seat = data;
++
++	seat->keyboard_focus = NULL;
+ }
+ 
+ static void
+@@ -665,6 +696,12 @@ keyboard_key(void *data,
+ 	     uint32_t state)
+ {
+ 	struct seat *seat = data;
++	struct window *window;
++
++	if (!own_surface(seat->keyboard_focus))
++		return;
++
++	window = wl_surface_get_user_data(seat->keyboard_focus);
+ 
+ 	if (state & WL_KEYBOARD_KEY_STATE_PRESSED) {
+ 		const xkb_keysym_t *syms;
+@@ -854,13 +891,11 @@ static void
+ output_done(void *data,
+ 	    struct wl_output *wl_output)
+ {
+-	struct output *output = data;
++	struct window *window;
+ 	struct seat *seat;
+ 
+-	if (window) {
+-		if (output->scale != window->scale)
+-			update_scale(window);
+-	}
++	wl_list_for_each(window, &windows, link)
++		update_scale(window);
+ 
+ 	wl_list_for_each(seat, &seats, link) {
+ 		try_update_cursor(seat);
+@@ -965,11 +1000,15 @@ registry_handle_global_remove(void *data, struct wl_registry *registry,
+ 
+ 	wl_list_for_each(output, &outputs, link) {
+ 		if (output->id == name) {
+-			wl_list_for_each(window_output, &window->outputs,
+-					 link) {
+-				if (window_output->output == output) {
+-					wl_list_remove(&window_output->link);
+-					free(window_output);
++			struct window *window;
++
++			wl_list_for_each(window, &windows, link) {
++				wl_list_for_each(window_output, &window->outputs,
++						 link) {
++					if (window_output->output == output) {
++						wl_list_remove(&window_output->link);
++						free(window_output);
++					}
+ 				}
+ 			}
+ 			wl_list_remove(&output->link);
+@@ -1155,13 +1194,16 @@ static void
+ handle_close(struct libdecor_frame *frame,
+ 	     void *user_data)
+ {
+-	exit(EXIT_SUCCESS);
++	struct window *window = user_data;
++
++	window_free(window);
+ }
+ 
+ static void
+ handle_commit(struct libdecor_frame *frame,
+ 	      void *user_data)
+ {
++	struct window *window = user_data;
+ 	wl_surface_commit(window->wl_surface);
+ }
+ 
+@@ -1170,6 +1212,8 @@ handle_dismiss_popup(struct libdecor_frame *frame,
+ 		     const char *seat_name,
+ 		     void *user_data)
+ {
++	struct window *window = user_data;
++
+ 	popup_destroy(window->popup);
+ }
+ 
+@@ -1236,10 +1280,14 @@ free_outputs()
+ 	struct window_output *window_output, *window_output_tmp;
+ 
+ 	wl_list_for_each(output, &outputs, link) {
+-		wl_list_for_each_safe(window_output, window_output_tmp, &window->outputs, link) {
+-			if (window_output->output == output) {
+-				wl_list_remove(&window_output->link);
+-				free(window_output);
++		struct window *window;
++
++		wl_list_for_each(window, &windows, link) {
++			wl_list_for_each_safe(window_output, window_output_tmp, &window->outputs, link) {
++				if (window_output->output == output) {
++					wl_list_remove(&window_output->link);
++					free(window_output);
++				}
+ 			}
+ 		}
+ 		wl_list_remove(&output->link);
+@@ -1249,6 +1297,57 @@ free_outputs()
+ 	}
+ }
+ 
++static struct window *
++window_new(struct libdecor *context)
++{
++	struct window *window;
++	struct output *output;
++
++	window = zalloc(sizeof *window);
++	wl_list_insert(&windows, &window->link);
++	window->context = context;
++	window->scale = 1;
++	window->title_index = 0;
++	wl_list_for_each(output, &outputs, link) {
++		window->scale = MAX(window->scale, output->scale);
++	}
++	wl_list_init(&window->outputs);
++	window->wl_surface = wl_compositor_create_surface(wl_compositor);
++	wl_proxy_set_tag((struct wl_proxy *) window->wl_surface, &proxy_tag);
++	wl_surface_add_listener(window->wl_surface, &surface_listener, window);
++
++	/* initialise content dimensions */
++	window->floating_width = DEFAULT_WIDTH;
++	window->floating_height = DEFAULT_HEIGHT;
++
++	window->frame = libdecor_decorate(context, window->wl_surface,
++					  &libdecor_frame_iface, window);
++	libdecor_frame_set_app_id(window->frame, "libdecor-demo");
++	libdecor_frame_set_title(window->frame, "libdecor demo");
++	libdecor_frame_map(window->frame);
++
++	libdecor_frame_set_min_content_size(window->frame, 15 * chk, 10 * chk);
++
++	return window;
++}
++
++static void
++window_free(struct window *window)
++{
++	struct seat *seat;
++
++	wl_list_for_each(seat, &seats, link) {
++		if (seat->pointer_focus == window->wl_surface)
++			seat->pointer_focus = NULL;
++		if (seat->keyboard_focus == window->wl_surface)
++			seat->keyboard_focus = NULL;
++	}
++	wl_list_remove(&window->link);
++	libdecor_frame_unref(window->frame);
++	wl_surface_destroy(window->wl_surface);
++	free(window);
++}
++
+ int
+ main(int argc,
+      char **argv)
+@@ -1258,7 +1357,6 @@ main(int argc,
+ 	struct wl_display *wl_display;
+ 	struct wl_registry *wl_registry;
+ 	struct libdecor *context;
+-	struct output *output;
+ 	int timeout = -1;
+ 	bool timed_quit = false;
+ 
+@@ -1278,6 +1376,7 @@ main(int argc,
+ 
+ 	wl_list_init(&seats);
+ 	wl_list_init(&outputs);
++	wl_list_init(&windows);
+ 
+ 	wl_registry = wl_display_get_registry(wl_display);
+ 	wl_registry_add_listener(wl_registry,
+@@ -1290,43 +1389,26 @@ main(int argc,
+ 		return EXIT_FAILURE;
+ 	}
+ 
+-	window = zalloc(sizeof *window);
+-	window->scale = 1;
+-	window->title_index = 0;
+-	wl_list_for_each(output, &outputs, link) {
+-		window->scale = MAX(window->scale, output->scale);
+-	}
+-	wl_list_init(&window->outputs);
+-	window->wl_surface = wl_compositor_create_surface(wl_compositor);
+-	wl_surface_add_listener(window->wl_surface, &surface_listener, window);
+-
+-	/* initialise content dimensions */
+-	window->floating_width = DEFAULT_WIDTH;
+-	window->floating_height = DEFAULT_HEIGHT;
+-
+ 	context = libdecor_new(wl_display, &libdecor_iface);
+-	window->frame = libdecor_decorate(context, window->wl_surface,
+-					  &libdecor_frame_iface, window);
+-	libdecor_frame_set_app_id(window->frame, "libdecor-demo");
+-	libdecor_frame_set_title(window->frame, "libdecor demo");
+-	libdecor_frame_map(window->frame);
++	window_new(context);
+ 
+ 	gettimeofday(&start, NULL);
+-	libdecor_frame_set_min_content_size(window->frame, 15 * chk, 10 * chk);
+ 
+ 	while (libdecor_dispatch(context, timeout) >= 0) {
+ 		if (timed_quit) {
+ 			gettimeofday(&now, NULL);
+ 			if (now.tv_sec >= start.tv_sec + 2) {
++				struct window *window;
+ 				fprintf(stderr, "Exiting due to --timed-quit\n");
+-				libdecor_frame_close(window->frame);
++				wl_list_for_each(window, &windows, link)
++					libdecor_frame_close(window->frame);
+ 			}
+ 		}
++		if (wl_list_empty(&windows))
++			break;
+ 	}
+ 
+ 	free_outputs();
+ 
+-	free(window);
+-
+ 	return EXIT_SUCCESS;
+ }
+-- 
+GitLab
+
+
+From c7627fd8fd207047f3fdb63500d4a99e1e8c0b01 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:12:42 +0100
+Subject: [PATCH 05/20] demo: Open new window when pressing 'n'
+
+---
+ demo/demo.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/demo/demo.c b/demo/demo.c
+index 1250ace..0faaeb1 100644
+--- a/demo/demo.c
++++ b/demo/demo.c
+@@ -778,6 +778,10 @@ keyboard_key(void *data,
+ 			       libdecor_frame_is_visible(window->frame) ?
+ 				       "visible" : "hidden");
+ 			break;
++		case XKB_KEY_n: /* open new window */
++			printf("new window\n");
++			window_new(window->context);
++			break;
+ 		}
+ 	}
+ }
+-- 
+GitLab
+
+
+From 14b14b32532bbd4ee5544a42bd89f7f4a489a355 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:13:05 +0100
+Subject: [PATCH 06/20] demo: Fix redraw after state change
+
+We'd miss redrawing when going e.g. inactive -> active, unless something
+else triggered a redraw.
+---
+ demo/demo.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/demo/demo.c b/demo/demo.c
+index 0faaeb1..e92e13e 100644
+--- a/demo/demo.c
++++ b/demo/demo.c
+@@ -1163,6 +1163,7 @@ handle_configure(struct libdecor_frame *frame,
+ 	int width, height;
+ 	enum libdecor_window_state window_state;
+ 	struct libdecor_state *state;
++	bool should_redraw = false;
+ 
+ 	/* Update window state first for the correct calculations */
+ 	if (!libdecor_configuration_get_window_state(configuration,
+@@ -1178,9 +1179,22 @@ handle_configure(struct libdecor_frame *frame,
+ 	width = (width == 0) ? window->floating_width : width;
+ 	height = (height == 0) ? window->floating_height : height;
+ 
++	if (window->configured_width != width ||
++	    window->configured_height != height)
++		should_redraw = true;
++
+ 	window->configured_width = width;
+ 	window->configured_height = height;
+ 
++	if (!libdecor_configuration_get_window_state(configuration,
++						     &window_state))
++		window_state = LIBDECOR_WINDOW_STATE_NONE;
++
++	if (window->window_state != window_state)
++		should_redraw = true;
++
++	window->window_state = window_state;
++
+ 	state = libdecor_state_new(width, height);
+ 	libdecor_frame_commit(frame, state, configuration);
+ 	libdecor_state_free(state);
+@@ -1191,7 +1205,10 @@ handle_configure(struct libdecor_frame *frame,
+ 		window->floating_height = height;
+ 	}
+ 
+-	redraw(window);
++	if (should_redraw)
++		redraw(window);
++	else
++		wl_surface_commit(window->wl_surface);
+ }
+ 
+ static void
+-- 
+GitLab
+
+
+From 6f6e3349a017e00725a172eecd108fd21b03b44c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:13:37 +0100
+Subject: [PATCH 07/20] demo: Also unref the libdecor context
+
+---
+ demo/demo.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/demo/demo.c b/demo/demo.c
+index e92e13e..23c64da 100644
+--- a/demo/demo.c
++++ b/demo/demo.c
+@@ -1430,6 +1430,7 @@ main(int argc,
+ 	}
+ 
+ 	free_outputs();
++	libdecor_unref(context);
+ 
+ 	return EXIT_SUCCESS;
+ }
+-- 
+GitLab
+
+
+From a4b0b1b10f3b2ba516380a7452a9978f77b707ed Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:28:58 +0100
+Subject: [PATCH 08/20] Make configurations ref counted
+
+This allows keeping them alive for future usage.
+---
+ src/libdecor.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/src/libdecor.c b/src/libdecor.c
+index fbe5f2d..6409db8 100644
+--- a/src/libdecor.c
++++ b/src/libdecor.c
+@@ -78,6 +78,8 @@ struct libdecor_limits {
+ };
+ 
+ struct libdecor_configuration {
++	int ref_count;
++
+ 	uint32_t serial;
+ 
+ 	bool has_window_state;
+@@ -230,14 +232,24 @@ libdecor_configuration_new(void)
+ 	struct libdecor_configuration *configuration;
+ 
+ 	configuration = zalloc(sizeof *configuration);
++	configuration->ref_count = 1;
+ 
+ 	return configuration;
+ }
+ 
++static struct libdecor_configuration *
++libdecor_configuration_ref(struct libdecor_configuration *configuration)
++{
++	configuration->ref_count++;
++	return configuration;
++}
++
+ static void
+-libdecor_configuration_free(struct libdecor_configuration *configuration)
++libdecor_configuration_unref(struct libdecor_configuration *configuration)
+ {
+-	free(configuration);
++	configuration->ref_count--;
++	if (configuration->ref_count == 0)
++		free(configuration);
+ }
+ 
+ static bool
+@@ -366,7 +378,7 @@ xdg_surface_configure(void *user_data,
+ 				     configuration,
+ 				     frame_priv->user_data);
+ 
+-	libdecor_configuration_free(configuration);
++	libdecor_configuration_unref(configuration);
+ }
+ 
+ static const struct xdg_surface_listener xdg_surface_listener = {
+-- 
+GitLab
+
+
+From d3d333c7d78190d7d24fb11780f5cdb98db93be7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:33:38 +0100
+Subject: [PATCH 09/20] Add plugin API to get the current configuration
+
+This allows to get the most recent configuration even if an application
+passed NULL.
+---
+ src/libdecor-plugin.h |  3 +++
+ src/libdecor.c        | 21 ++++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/src/libdecor-plugin.h b/src/libdecor-plugin.h
+index d57430e..cfeeccc 100644
+--- a/src/libdecor-plugin.h
++++ b/src/libdecor-plugin.h
+@@ -175,6 +175,9 @@ libdecor_state_get_content_height(struct libdecor_state *state);
+ enum libdecor_window_state
+ libdecor_state_get_window_state(struct libdecor_state *state);
+ 
++struct libdecor_configuration *
++libdecor_frame_get_configuration(struct libdecor_frame *frame);
++
+ int
+ libdecor_plugin_init(struct libdecor_plugin *plugin,
+ 		     struct libdecor *context,
+diff --git a/src/libdecor.c b/src/libdecor.c
+index 6409db8..adda957 100644
+--- a/src/libdecor.c
++++ b/src/libdecor.c
+@@ -114,6 +114,7 @@ struct libdecor_frame_private {
+ 	} state;
+ 
+ 	struct libdecor_configuration *pending_configuration;
++	struct libdecor_configuration *current_configuration;
+ 
+ 	int content_width;
+ 	int content_height;
+@@ -369,9 +370,16 @@ xdg_surface_configure(void *user_data,
+ 	configuration = frame_priv->pending_configuration;
+ 	frame_priv->pending_configuration = NULL;
+ 
+-	if (!configuration)
++	if (!configuration && frame_priv->current_configuration)
++		configuration = libdecor_configuration_ref(frame_priv->current_configuration);
++	else if (!configuration)
+ 		configuration = libdecor_configuration_new();
+ 
++	if (frame_priv->current_configuration)
++		libdecor_configuration_unref(frame_priv->current_configuration);
++	frame_priv->current_configuration =
++		libdecor_configuration_ref(configuration);
++
+ 	configuration->serial = serial;
+ 
+ 	frame_priv->iface->configure(frame,
+@@ -711,6 +719,9 @@ libdecor_frame_unref(struct libdecor_frame *frame)
+ 
+ 		plugin->priv->iface->frame_free(plugin, frame);
+ 
++		if (frame_priv->current_configuration)
++			libdecor_configuration_unref(frame_priv->current_configuration);
++
+ 		free(frame_priv->state.title);
+ 		free(frame_priv->state.app_id);
+ 
+@@ -1347,6 +1358,14 @@ libdecor_frame_get_window_state(struct libdecor_frame *frame)
+ 	return frame_priv->window_state;
+ }
+ 
++LIBDECOR_EXPORT struct libdecor_configuration *
++libdecor_frame_get_configuration(struct libdecor_frame *frame)
++{
++	struct libdecor_frame_private *frame_priv = frame->priv;
++
++	return frame_priv->current_configuration;
++}
++
+ LIBDECOR_EXPORT enum libdecor_wm_capabilities
+ libdecor_frame_get_wm_capabilities(struct libdecor_frame *frame)
+ {
+-- 
+GitLab
+
+
+From b58e27769b593b713bf210ab509fee0a9456cc8a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:35:26 +0100
+Subject: [PATCH 10/20] Add plugin API to check whether a config is fixed
+
+Fixed here means e.g. maximized, tiled, etc, where the size is
+determined by the compositor and not the application.
+---
+ src/libdecor-plugin.h |  3 +++
+ src/libdecor.c        | 10 ++++++++++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/src/libdecor-plugin.h b/src/libdecor-plugin.h
+index cfeeccc..c770a9a 100644
+--- a/src/libdecor-plugin.h
++++ b/src/libdecor-plugin.h
+@@ -186,4 +186,7 @@ libdecor_plugin_init(struct libdecor_plugin *plugin,
+ void
+ libdecor_plugin_release(struct libdecor_plugin *plugin);
+ 
++bool
++libdecor_configuration_is_fixed_size(struct libdecor_configuration *configuration);
++
+ #endif /* LIBDECOR_PLUGIN_H */
+diff --git a/src/libdecor.c b/src/libdecor.c
+index adda957..e36c064 100644
+--- a/src/libdecor.c
++++ b/src/libdecor.c
+@@ -160,6 +160,16 @@ state_is_floating(enum libdecor_window_state window_state)
+ 	return !(window_state & states_non_floating);
+ }
+ 
++LIBDECOR_EXPORT bool
++libdecor_configuration_is_fixed_size(struct libdecor_configuration *configuration)
++{
++	if (!configuration->has_window_state ||
++	    !configuration->has_size)
++		return false;
++
++	return !state_is_floating(configuration->window_state);
++}
++
+ static void
+ constrain_content_size(const struct libdecor_frame *frame,
+ 		       int *width,
+-- 
+GitLab
+
+
+From 8b08a6e698a1ae19e5de240a3d68070e49f85362 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:35:57 +0100
+Subject: [PATCH 11/20] Add plugin API to get the window size from a config
+
+---
+ src/libdecor-plugin.h |  6 ++++++
+ src/libdecor.c        | 14 ++++++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/src/libdecor-plugin.h b/src/libdecor-plugin.h
+index c770a9a..17b2a97 100644
+--- a/src/libdecor-plugin.h
++++ b/src/libdecor-plugin.h
+@@ -189,4 +189,10 @@ libdecor_plugin_release(struct libdecor_plugin *plugin);
+ bool
+ libdecor_configuration_is_fixed_size(struct libdecor_configuration *configuration);
+ 
++bool
++libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
++				       struct libdecor_frame *frame,
++				       int *width,
++				       int *height);
++
+ #endif /* LIBDECOR_PLUGIN_H */
+diff --git a/src/libdecor.c b/src/libdecor.c
+index e36c064..3ee1c45 100644
+--- a/src/libdecor.c
++++ b/src/libdecor.c
+@@ -357,6 +357,20 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
+ 	return true;
+ }
+ 
++LIBDECOR_EXPORT bool
++libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
++				       struct libdecor_frame *frame,
++				       int *width,
++				       int *height)
++{
++	if (!configuration->has_size)
++		return false;
++
++	*width = configuration->window_width;
++	*height = configuration->window_height;
++	return true;
++}
++
+ LIBDECOR_EXPORT bool
+ libdecor_configuration_get_window_state(struct libdecor_configuration *configuration,
+ 					enum libdecor_window_state *window_state)
+-- 
+GitLab
+
+
+From 94e102ef6fe424309f05480020ae550ee044a7be Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:36:40 +0100
+Subject: [PATCH 12/20] utils: Add strcmp variant that accepts NULL
+
+This is inspired by g_strcmp0() which allows passing NULL to any
+argument.
+---
+ src/utils.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/utils.h b/src/utils.h
+index 7892793..102a9ff 100644
+--- a/src/utils.h
++++ b/src/utils.h
+@@ -27,6 +27,7 @@
+ #define UTILS_H
+ 
+ #include <stdlib.h>
++#include <string.h>
+ 
+ #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+ #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+@@ -45,4 +46,15 @@ zalloc(size_t size)
+ 	return calloc(1, size);
+ }
+ 
++static inline int
++libdecor_strcmp0 (const char *str1,
++		  const char *str2)
++{
++  if (!str1)
++    return -(str1 != str2);
++  if (!str2)
++    return str1 != str2;
++  return strcmp(str1, str2);
++}
++
+ #endif /* UTILS_H */
+-- 
+GitLab
+
+
+From 8d04eebe2bf18e3900072283232ff88ffd1894fe Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Fri, 27 Mar 2026 14:45:39 +0100
+Subject: [PATCH 13/20] Add out-of-process GTK4 plugin
+
+This introduces a GTK4 based plugin that runs all of the GTK specific
+bits in a dedicated process. The GTK4 client uses Wayland to connect to
+the GTK4 plugin, which tunnels most of the protocol traffic directly to
+the host compositor, with a few exceptions.
+
+The are primarily three types of protocol traffic that is not directly
+tunneled: xdg_wm_base, and a custom libdecor_shell protocol. While the
+GTK4 client interfaces using xdg_wm_base, xdg_toplevel, etc, this part
+of the protocol traffic gets transformed, making the xdg_toplevel of the
+GTK4 client showing the decorations a subsurface that is placed below
+the application's main surface. The custom libdecor_shell protocol is
+used to communicate with the client details about the content it is
+decorating. It uses this information to layout an empty widget that
+matches the content, and then communicates back enough information
+allowing the plugin side to correctly position the subsurface.
+
+The majority of the protocol tunnel code is generated by the python
+script 'scanner.py'. Disclaimer: The code that parses the Wayland XML
+file turning it into a tree of python data classes was originally
+generated by an LLM but was heavily edited after generation.
+
+The python script aims to be compatible with python 3.9.
+
+Currently the wl_compositor is manually tunneled, due to the more hands
+on management of surfaces.
+---
+ meson.build                                 |    2 +-
+ meson_options.txt                           |    2 +
+ src/plugins/common/libdecor-os-utils.c      |  111 ++
+ src/plugins/common/libdecor-os-utils.h      |   42 +
+ src/plugins/common/libdecor-process-utils.c |  187 ++
+ src/plugins/common/libdecor-process-utils.h |   70 +
+ src/plugins/common/meson.build              |   18 +
+ src/plugins/gtk4/libdecor-gtk4-client.c     |  399 +++++
+ src/plugins/gtk4/libdecor-gtk4-tunnels.c    |  733 ++++++++
+ src/plugins/gtk4/libdecor-gtk4.c            | 1738 +++++++++++++++++++
+ src/plugins/gtk4/libdecor-gtk4.h            |  158 ++
+ src/plugins/gtk4/libdecor-shell.xml         |   55 +
+ src/plugins/gtk4/meson.build                |  242 +++
+ src/plugins/gtk4/scanner.py                 |  671 +++++++
+ src/plugins/gtk4/wayland-drm.xml            |  189 ++
+ src/plugins/meson.build                     |    5 +
+ src/utils.h                                 |   10 +
+ 17 files changed, 4631 insertions(+), 1 deletion(-)
+ create mode 100644 src/plugins/common/libdecor-os-utils.c
+ create mode 100644 src/plugins/common/libdecor-os-utils.h
+ create mode 100644 src/plugins/common/libdecor-process-utils.c
+ create mode 100644 src/plugins/common/libdecor-process-utils.h
+ create mode 100644 src/plugins/gtk4/libdecor-gtk4-client.c
+ create mode 100644 src/plugins/gtk4/libdecor-gtk4-tunnels.c
+ create mode 100644 src/plugins/gtk4/libdecor-gtk4.c
+ create mode 100644 src/plugins/gtk4/libdecor-gtk4.h
+ create mode 100644 src/plugins/gtk4/libdecor-shell.xml
+ create mode 100644 src/plugins/gtk4/meson.build
+ create mode 100755 src/plugins/gtk4/scanner.py
+ create mode 100644 src/plugins/gtk4/wayland-drm.xml
+
+diff --git a/meson.build b/meson.build
+index 145fdda..1e92328 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1,6 +1,6 @@
+ project('libdecor', 'c',
+   version: '0.2.2',
+-  meson_version: '>= 0.54.0',
++  meson_version: '>= 0.55.0',
+   license: 'MIT',
+   default_options: [
+     'c_std=c99',
+diff --git a/meson_options.txt b/meson_options.txt
+index ec7153c..90395be 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -5,3 +5,5 @@ option('dbus', type: 'feature', value: 'enabled', description: 'use D-Bus to fet
+ option('install_demo', type: 'boolean', value: false, description: 'install demo programs')
+ 
+ option('gtk', type: 'feature', value: 'enabled', description: 'build GTK plugin')
++
++option('gtk4', type: 'feature', value: 'enabled', description: 'build GTK4 plugin')
+diff --git a/src/plugins/common/libdecor-os-utils.c b/src/plugins/common/libdecor-os-utils.c
+new file mode 100644
+index 0000000..21ce5c6
+--- /dev/null
++++ b/src/plugins/common/libdecor-os-utils.c
+@@ -0,0 +1,111 @@
++/*
++ * Copyright © 2012 Collabora, Ltd.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#include "config.h"
++
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <sys/epoll.h>
++#include <string.h>
++#include <stdlib.h>
++#include <sys/mman.h>
++
++#include "libdecor-os-utils.h"
++
++#define READONLY_SEALS (F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE)
++
++static int
++fd_set_cloexec(int fd)
++{
++	int flags;
++
++	if (fd == -1)
++		return -1;
++
++	flags = fcntl(fd, F_GETFD);
++	if (flags == -1)
++		return -1;
++
++	if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
++		return -1;
++
++	return 0;
++}
++
++static int
++set_cloexec_or_close(int fd)
++{
++	if (fd_set_cloexec(fd) != 0) {
++		close(fd);
++		return -1;
++	}
++	return fd;
++}
++
++int
++libdecor_os_socketpair_cloexec(int domain, int type, int protocol, int *sv)
++{
++	int ret;
++
++#ifdef SOCK_CLOEXEC
++	ret = socketpair(domain, type | SOCK_CLOEXEC, protocol, sv);
++	if (ret == 0 || errno != EINVAL)
++		return ret;
++#endif
++
++	ret = socketpair(domain, type, protocol, sv);
++	if (ret < 0)
++		return ret;
++
++	sv[0] = set_cloexec_or_close(sv[0]);
++	sv[1] = set_cloexec_or_close(sv[1]);
++
++	if (sv[0] != -1 && sv[1] != -1)
++		return 0;
++
++	close(sv[0]);
++	close(sv[1]);
++	return -1;
++}
++
++int
++libdecor_os_epoll_create_cloexec(void)
++{
++	int fd;
++
++#ifdef EPOLL_CLOEXEC
++	fd = epoll_create1(EPOLL_CLOEXEC);
++	if (fd >= 0)
++		return fd;
++	if (errno != EINVAL)
++		return -1;
++#endif
++
++	fd = epoll_create(1);
++	return set_cloexec_or_close(fd);
++}
+diff --git a/src/plugins/common/libdecor-os-utils.h b/src/plugins/common/libdecor-os-utils.h
+new file mode 100644
+index 0000000..6445370
+--- /dev/null
++++ b/src/plugins/common/libdecor-os-utils.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright © 2012 Collabora, Ltd.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#ifndef LIBDECOR_OS_UTILS_H
++#define LIBDECOR_OS_UTILS_H
++
++#include "config.h"
++
++#include <sys/types.h>
++
++int
++libdecor_os_fd_set_cloexec(int fd);
++
++int
++libdecor_os_socketpair_cloexec(int domain, int type, int protocol, int *sv);
++
++int
++libdecor_os_epoll_create_cloexec(void);
++
++#endif /* LIBDECOR_OS_UTILS_H */
+diff --git a/src/plugins/common/libdecor-process-utils.c b/src/plugins/common/libdecor-process-utils.c
+new file mode 100644
+index 0000000..bcfd322
+--- /dev/null
++++ b/src/plugins/common/libdecor-process-utils.c
+@@ -0,0 +1,187 @@
++/*
++ * Copyright 2022 Collabora, Ltd.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#include "config.h"
++
++#include <assert.h>
++#include <ctype.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include <wayland-util.h>
++
++#include "utils.h"
++#include "libdecor-os-utils.h"
++#include "libdecor-process-utils.h"
++
++extern char **environ; /* defined by libc */
++
++/**
++ * Exactly like asprintf(), but sets *str_out to NULL if it fails.
++ *
++ * If str_out is NULL, does nothing.
++ */
++static inline void __attribute__ ((format (printf, 2, 3)))
++str_printf(char **str_out, const char *fmt, ...)
++{
++	char *msg;
++	va_list ap;
++	int ret;
++
++	if (!str_out)
++		return;
++
++	va_start(ap, fmt);
++	ret = vasprintf(&msg, fmt, ap);
++	va_end(ap);
++
++	if (ret >= 0)
++		*str_out = msg;
++	else
++		*str_out = NULL;
++}
++
++void
++libdecor_custom_env_init_from_environ(struct custom_env *env)
++{
++	char **it;
++	char **ep;
++
++	wl_array_init(&env->envp);
++	env->env_finalized = false;
++	wl_array_init(&env->argp);
++	env->arg_finalized = false;
++
++	for (it = environ; *it; it++) {
++		ep = wl_array_add(&env->envp, sizeof *ep);
++		assert(ep);
++		*ep = strdup(*it);
++		assert(*ep);
++	}
++}
++
++void
++libdecor_custom_env_fini(struct custom_env *env)
++{
++	char **p;
++
++	wl_array_for_each(p, &env->envp)
++		free(*p);
++	wl_array_release(&env->envp);
++
++	wl_array_for_each(p, &env->argp)
++		free(*p);
++	wl_array_release(&env->argp);
++}
++
++static char **
++libdecor_custom_env_get_env_var(struct custom_env *env, const char *name)
++{
++	char **ep;
++	size_t name_len = strlen(name);
++
++	wl_array_for_each(ep, &env->envp) {
++		char *entry = *ep;
++
++		if (strncmp(entry, name, name_len) == 0 &&
++		    entry[name_len] == '=') {
++			return ep;
++		}
++	}
++
++	return NULL;
++}
++
++void
++libdecor_custom_env_add_arg(struct custom_env *env, const char *arg)
++{
++	char **ap;
++
++	assert(!env->arg_finalized);
++
++	ap = wl_array_add(&env->argp, sizeof *ap);
++	assert(ap);
++
++	*ap = strdup(arg);
++	assert(*ap);
++}
++
++void
++libdecor_custom_env_set_env_var(struct custom_env *env,
++				const char *name,
++				const char *value)
++{
++	char **ep;
++
++	assert(strchr(name, '=') == NULL);
++	assert(!env->env_finalized);
++
++	ep = libdecor_custom_env_get_env_var(env, name);
++	if (ep)
++		free(*ep);
++	else
++		ep = wl_array_add(&env->envp, sizeof *ep);
++	assert(ep);
++
++	str_printf(ep, "%s=%s", name, value);
++	assert(*ep);
++}
++
++char * const *
++libdecor_custom_env_get_envp(struct custom_env *env)
++{
++	char **ep;
++
++	assert(!env->env_finalized);
++
++	/* add terminating NULL */
++	ep = wl_array_add(&env->envp, sizeof *ep);
++	assert(ep);
++	*ep = NULL;
++
++	env->env_finalized = true;
++
++	return env->envp.data;
++}
++
++char * const *
++libdecor_custom_env_get_argp(struct custom_env *env)
++{
++	char **ap;
++
++	assert(!env->arg_finalized);
++
++	/* add terminating NULL */
++	ap = wl_array_add(&env->argp, sizeof *ap);
++	assert(ap);
++	*ap = NULL;
++
++	env->arg_finalized = true;
++
++	return env->argp.data;
++}
+diff --git a/src/plugins/common/libdecor-process-utils.h b/src/plugins/common/libdecor-process-utils.h
+new file mode 100644
+index 0000000..11021da
+--- /dev/null
++++ b/src/plugins/common/libdecor-process-utils.h
+@@ -0,0 +1,70 @@
++/*
++ * Copyright 2022 Collabora, Ltd.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#ifndef LIBDECOR_PROCESS_UTILS_H
++#define LIBDECOR_PROCESS_UTILS_H
++
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include <wayland-util.h>
++
++/**
++ * A container for environment variables and/or process arguments, designed to
++ * be used when forking child processes, as setenv() and anything which
++ * allocates memory cannot be used between fork() and exec().
++ */
++struct custom_env {
++	struct wl_array envp;
++	bool env_finalized;
++	struct wl_array argp;
++	bool arg_finalized;
++};
++
++void
++libdecor_custom_env_init_from_environ(struct custom_env *env);
++
++void
++libdecor_custom_env_fini(struct custom_env *env);
++
++void
++libdecor_custom_env_set_env_var(struct custom_env *env,
++				const char *name,
++				const char *value);
++
++void
++libdecor_custom_env_add_arg(struct custom_env *env,
++			    const char *arg);
++
++char * const *
++libdecor_custom_env_get_envp(struct custom_env *env);
++
++char * const *
++libdecor_custom_env_get_argp(struct custom_env *env);
++
++#endif /* LIBDECOR_PROCESS_UTILS_H */
+diff --git a/src/plugins/common/meson.build b/src/plugins/common/meson.build
+index f4e6fcc..29c58c8 100644
+--- a/src/plugins/common/meson.build
++++ b/src/plugins/common/meson.build
+@@ -12,3 +12,21 @@ plugin_common = static_library('cairo-blur',
+   gnu_symbol_visibility: 'hidden',
+   install: false,
+ )
++
++os_utils = static_library('os-utils',
++  sources: [
++    'libdecor-os-utils.c',
++    'libdecor-process-utils.c',
++  ],
++  include_directories: [
++    top_includepath,
++    libdecor_includepath,
++  ],
++  dependencies: [
++  ],
++  install: false,
++)
++
++os_utils_dep = declare_dependency(
++  link_with: os_utils,
++)
+diff --git a/src/plugins/gtk4/libdecor-gtk4-client.c b/src/plugins/gtk4/libdecor-gtk4-client.c
+new file mode 100644
+index 0000000..200419f
+--- /dev/null
++++ b/src/plugins/gtk4/libdecor-gtk4-client.c
+@@ -0,0 +1,399 @@
++/*
++ * Copyright © 2026 Red Hat Inc.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#include "config.h"
++
++#include <assert.h>
++#include <dlfcn.h>
++#include <gdk/wayland/gdkwayland.h>
++#include <gtk/gtk.h>
++
++#include "utils.h"
++
++#include "libdecor-shell-client-protocol.h"
++
++static struct libdecor_shell *libdecor_shell;
++static struct wl_display *libdecor_shell_display;
++
++static void *libwayland_client = NULL;
++
++struct frame_window {
++	GtkWidget *window;
++	struct libdecor_shell_surface *shell_surface;
++};
++
++WL_EXPORT struct wl_display *
++wl_display_connect(const char *name);
++
++WL_EXPORT struct wl_proxy *
++wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
++			     const struct wl_interface *interface, uint32_t version,
++			     uint32_t flags, union wl_argument *args);
++
++static const struct wl_registry_listener registry_listener;
++
++static void *
++ensure_libwayland_client(void)
++{
++	if (!libwayland_client) {
++		libwayland_client = dlopen("libwayland-client.so.0", RTLD_LAZY);
++		if (!libwayland_client) {
++			perror("Cannot load libwayland-client.so.0");
++			abort();
++		}
++	}
++	return libwayland_client;
++}
++
++static void
++ensure_libdecor_shell(struct wl_display *wl_display)
++{
++	struct wl_registry *wl_registry;
++
++	if (libdecor_shell)
++		return;
++
++	libdecor_shell_display = wl_display;
++	wl_registry = wl_display_get_registry(wl_display);
++	wl_registry_add_listener(wl_registry,
++				 &registry_listener,
++				 NULL);
++	wl_display_roundtrip(wl_display);
++	assert(libdecor_shell);
++}
++
++struct wl_display *
++wl_display_connect(const char *name)
++{
++	static struct wl_display * (* real_display_connect) (const char *name) = NULL;
++	struct wl_display *wl_display;
++
++	if (!real_display_connect) {
++		libwayland_client = ensure_libwayland_client();
++
++		real_display_connect = dlsym(libwayland_client,
++					     "wl_display_connect");
++		if (!real_display_connect) {
++			perror("Cannot find wl_display_connect symbol");
++			abort();
++		}
++	}
++
++	wl_display = real_display_connect(name);
++	if (wl_display)
++		ensure_libdecor_shell(wl_display);
++	return wl_display;
++}
++
++struct wl_display *
++wl_display_connect_to_fd(int fd)
++{
++	static struct wl_display * (* real_display_connect_fd) (int fd) = NULL;
++	struct wl_display *wl_display;
++
++	if (!real_display_connect_fd) {
++		libwayland_client = ensure_libwayland_client();
++
++		real_display_connect_fd = dlsym(libwayland_client,
++					     "wl_display_connect_to_fd");
++		if (!real_display_connect_fd) {
++			perror("Cannot find wl_display_connect_to_fd symbol");
++			abort();
++		}
++	}
++
++	wl_display = real_display_connect_fd(fd);
++	if (wl_display)
++		ensure_libdecor_shell(wl_display);
++	return wl_display;
++}
++
++struct wl_proxy *
++wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
++			     const struct wl_interface *interface, uint32_t version,
++			     uint32_t flags, union wl_argument *args)
++{
++	static struct wl_proxy * (* real_marshal_array_flags)(struct wl_proxy *proxy,
++							      uint32_t opcode,
++							      const struct wl_interface *interface,
++							      uint32_t version,
++							      uint32_t flags,
++							      union wl_argument *args) = NULL;
++
++	if (!real_marshal_array_flags) {
++		libwayland_client = ensure_libwayland_client();
++
++		real_marshal_array_flags = dlsym(libwayland_client,
++						 "wl_proxy_marshal_array_flags");
++		if (!real_marshal_array_flags) {
++			perror("Cannot find wl_proxy_marshal_array_flags symbol");
++			abort();
++		}
++	}
++
++	if (wl_proxy_get_interface(proxy) == &wl_display_interface &&
++	    wl_proxy_get_display(proxy) == libdecor_shell_display &&
++	    opcode == WL_DISPLAY_SYNC &&
++	    libdecor_shell) {
++		struct wl_proxy *wrapper = wl_proxy_create_wrapper(libdecor_shell);
++		struct wl_proxy *callback;
++
++		wl_proxy_set_queue(wrapper, wl_proxy_get_queue(proxy));
++		callback = real_marshal_array_flags(wrapper,
++						    LIBDECOR_SHELL_SYNC,
++						    &libdecor_shell_interface,
++						    libdecor_shell_get_version(libdecor_shell),
++						    flags, args);
++		wl_proxy_wrapper_destroy(wrapper);
++		return callback;
++	}
++
++
++	return real_marshal_array_flags(proxy, opcode, interface, version, flags, args);
++}
++
++static void
++on_after_layout(GdkFrameClock *clock,
++		int width,
++		int height,
++		struct frame_window *frame_window)
++{
++	GtkWidget *widget;
++	GtkWidget *native;
++	double native_x, native_y;
++	graphene_rect_t widget_bounds;
++	graphene_point_t content_origin;
++	graphene_point_t content_offset;
++
++	widget = gtk_window_get_child(GTK_WINDOW(frame_window->window));
++
++	native = GTK_WIDGET(gtk_widget_get_native(widget));
++	gtk_native_get_surface_transform(GTK_NATIVE(native), &native_x, &native_y);
++	if (!gtk_widget_compute_bounds(widget, frame_window->window, &widget_bounds))
++		return;
++
++	content_origin.x = 0;
++	content_origin.y = 0;
++	if (!gtk_widget_compute_point(widget, frame_window->window,
++				      &content_origin,
++				      &content_offset))
++		return;
++
++	libdecor_shell_surface_set_content_area(frame_window->shell_surface,
++						(int) floor(widget_bounds.origin.x),
++						(int) floor(widget_bounds.origin.y),
++						(int) floor(widget_bounds.size.width),
++						(int) floor(widget_bounds.size.height),
++						(int) roundf(native_x),
++						(int) roundf(native_y),
++						width, height);
++}
++
++static void
++libdecor_shell_surface_handle_configure_content(void *data,
++						struct libdecor_shell_surface *libdecor_shell_surface,
++						int32_t width,
++						int32_t height)
++{
++	struct frame_window *frame_window = data;
++	GtkWidget *widget =
++		gtk_window_get_child(GTK_WINDOW(frame_window->window));
++
++	if (width == 0 && height == 0) {
++		gtk_widget_set_size_request(widget, 1, 1);
++	} else {
++		gtk_widget_set_size_request(widget, width, height);
++		gtk_widget_set_size_request(frame_window->window, 1, 1);
++		gtk_window_set_default_size(GTK_WINDOW(frame_window->window), 1, 1);
++	}
++	
++}
++
++static void
++libdecor_shell_surface_handle_configure_title(void *data,
++					      struct libdecor_shell_surface *libdecor_shell_surface,
++					      const char *title)
++{
++	struct frame_window *frame_window = data;
++
++	gtk_window_set_title(GTK_WINDOW(frame_window->window), title);
++}
++
++static void
++libdecor_shell_surface_handle_dismiss(void *data,
++				      struct libdecor_shell_surface *libdecor_shell_surface)
++{
++	struct frame_window *frame_window = data;
++
++	gtk_window_destroy(GTK_WINDOW(frame_window->window));
++}
++
++static struct libdecor_shell_surface_listener libdecor_shell_surface_listener = {
++	.configure_content = libdecor_shell_surface_handle_configure_content,
++	.configure_title = libdecor_shell_surface_handle_configure_title,
++	.dismiss = libdecor_shell_surface_handle_dismiss,
++};
++
++static gboolean
++on_close_requested(GtkWindow *window,
++		   struct frame_window *frame_window)
++{
++	libdecor_shell_surface_close(frame_window->shell_surface);
++	return TRUE;
++}
++
++static void
++libdecor_shell_handle_request_frame(void *data,
++				    struct libdecor_shell *libdecor_shell,
++				    uint32_t serial)
++{
++	struct frame_window *frame_window;
++	GtkWidget *window;
++	GtkWidget *widget;
++	GdkSurface *surface;
++	struct wl_surface *wl_surface;
++
++	window = gtk_window_new();
++	frame_window = zalloc(sizeof *frame_window);
++	frame_window->window = window;
++
++	g_signal_connect(window, "close-request",
++			 G_CALLBACK(on_close_requested), frame_window);
++
++	widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
++	gtk_window_set_child(GTK_WINDOW(window), widget);
++	gtk_window_present(GTK_WINDOW(window));
++
++	if (libdecor_strcmp0(getenv("LIBDECOR_DEBUG_GTK4_INSPECTOR"), "1") == 0)
++		gtk_window_set_interactive_debugging(TRUE);
++
++	surface = gtk_native_get_surface(GTK_NATIVE(window));
++
++	g_signal_connect_after(surface, "layout", G_CALLBACK(on_after_layout),
++			       frame_window);
++
++	wl_surface = gdk_wayland_surface_get_wl_surface(surface);
++	
++	frame_window->shell_surface = libdecor_shell_create_frame(libdecor_shell,
++								  serial,
++								  wl_surface);
++	libdecor_shell_surface_add_listener(frame_window->shell_surface,
++					    &libdecor_shell_surface_listener,
++					    frame_window);
++}
++
++static void
++libdecor_shell_handle_terminate(void *data,
++				struct libdecor_shell *libdecor_shell)
++{
++	exit(EXIT_SUCCESS);
++}
++
++static struct libdecor_shell_listener libdecor_shell_listener = {
++	.request_frame = libdecor_shell_handle_request_frame,
++	.terminate = libdecor_shell_handle_terminate,
++};
++
++static void
++registry_handle_global(void *user_data,
++		       struct wl_registry *wl_registry,
++		       uint32_t id,
++		       const char *interface,
++		       uint32_t version)
++{
++	if (strcmp(interface, "libdecor_shell") == 0) {
++		libdecor_shell =
++			wl_registry_bind(wl_registry, id,
++					 &libdecor_shell_interface, 1);
++		libdecor_shell_add_listener(libdecor_shell,
++					    &libdecor_shell_listener,
++					    NULL);
++	}
++}
++
++static void
++registry_handle_global_remove(void *user_data,
++			      struct wl_registry *wl_registry,
++			      uint32_t name)
++{
++}
++
++static const struct wl_registry_listener registry_listener = {
++	registry_handle_global,
++	registry_handle_global_remove
++};
++
++static void
++update_header_bar_geometry(void)
++{
++	GtkWidget *window;
++	GtkWidget *widget;
++	int child_min = 0, child_nat = 0;
++
++	window = g_object_ref_sink(gtk_window_new());
++	widget = gtk_header_bar_new ();
++	gtk_window_set_child(GTK_WINDOW(window), widget);
++	gtk_widget_add_css_class (widget, "titlebar");
++	gtk_widget_add_css_class (widget, "default-decoration");
++	gtk_widget_measure(widget, GTK_ORIENTATION_VERTICAL, -1,
++			   &child_min, &child_nat, NULL, NULL);
++	libdecor_shell_titlebar_geometry(libdecor_shell, child_nat);
++	g_object_unref(window);
++}
++
++int
++main(int argc, char **argv)
++{
++	GMainLoop *loop;
++	const char *wayland_debug;
++
++	unsetenv("WAYLAND_DISPLAY");
++	unsetenv("DISPLAY");
++
++	wayland_debug = getenv("LIBDECOR_DEBUG_GTK4_WAYLAND_DEBUG");
++	if (wayland_debug)
++		setenv("WAYLAND_DEBUG", wayland_debug, 1);
++	else
++		unsetenv("WAYLAND_DEBUG");
++
++	gdk_set_allowed_backends("wayland");
++	if (!gtk_init_check ()) {
++		fprintf(stderr, "Failed to initialize GTK, exiting.\n");
++		return EXIT_FAILURE;
++	}
++
++	if (!libdecor_shell) {
++		fprintf(stderr, "Missing libdecor_shell global, exiting.\n");
++		return EXIT_FAILURE;
++	}
++
++	update_header_bar_geometry ();
++
++	libdecor_shell_ready(libdecor_shell);
++
++	loop = g_main_loop_new(NULL, FALSE);
++	g_main_loop_run(loop);
++	return EXIT_SUCCESS;
++}
+diff --git a/src/plugins/gtk4/libdecor-gtk4-tunnels.c b/src/plugins/gtk4/libdecor-gtk4-tunnels.c
+new file mode 100644
+index 0000000..6ac9fd1
+--- /dev/null
++++ b/src/plugins/gtk4/libdecor-gtk4-tunnels.c
+@@ -0,0 +1,733 @@
++/*
++ * Copyright © 2026 Red Hat Inc
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#include "config.h"
++
++#include "libdecor-gtk4.h"
++#include "libdecor-plugin.h"
++#include "utils.h"
++
++#include <stdio.h>
++#include <string.h>
++#include <wayland-client.h>
++#include <wayland-server.h>
++#include <unistd.h>
++
++#include "linux-dmabuf-v1-tunnel.h"
++#include "cursor-shape-v1-tunnel.h"
++#include "tablet-v2-tunnel.h"
++#include "wayland-drm-tunnel.h"
++#include "wayland-tunnel.h"
++
++#define MAX_COMPOSITOR_VERSION 5
++
++const char *libdecor_gtk4_proxy_tag = "libdecor-plugin-gtk4";
++
++struct libdecor_gtk4_tunnel_object *
++libdecor_gtk4_tunnel_object_new(struct libdecor_gtk4_tunnels *tunnels,
++				struct libdecor_gtk4_tunnel_object *parent,
++				void *proxy,
++				struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *object;
++
++	object = zalloc(sizeof(*object));
++	if (!object)
++		return NULL;
++
++	wl_list_init(&object->link);
++	wl_list_init(&object->children);
++	if (parent) {
++		object->parent = parent;
++		wl_list_insert(&parent->children, &object->link);
++	}
++	object->tunnels = tunnels;
++	object->proxy = proxy;
++	object->resource = resource;
++
++	return object;
++}
++
++void
++libdecor_gtk4_tunnel_object_free(struct libdecor_gtk4_tunnel_object *object)
++{
++	struct libdecor_gtk4_tunnel_object *child, *tmp;
++
++	wl_list_remove(&object->link);
++	wl_list_for_each_safe(child, tmp, &object->children, link) {
++		wl_list_remove(&child->link);
++		if (object->parent) {
++			wl_list_insert(&object->parent->children, &child->link);
++			child->parent = object->parent;
++		} else {
++			wl_list_init(&child->link);
++			child->parent = NULL;
++		}
++	}
++	if (object->free_user_data)
++		object->free_user_data(object->user_data);
++
++	free(object);
++}
++
++static void
++libdecor_gtk4_global_free(struct libdecor_gtk4_global *global)
++{
++	wl_global_destroy(global->wl_global);
++	wl_list_remove(&global->link);
++	free(global);
++}
++
++static void
++surface_destroy(struct wl_client *client, struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	wl_surface_destroy(tunnel_object->proxy);
++	wl_resource_destroy(tunnel_object->resource);
++}
++
++static void
++surface_attach(struct wl_client *client,
++	       struct wl_resource *resource,
++	       struct wl_resource *buffer_resource, int32_t sx, int32_t sy)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_tunnel_object *buffer = NULL;
++
++	if (buffer_resource)
++		buffer = wl_resource_get_user_data(buffer_resource);
++	wl_surface_attach(surface_tunnel_object->proxy,
++			  buffer ? buffer->proxy : NULL,
++			  sx, sy);
++}
++
++static void
++surface_damage(struct wl_client *client,
++	       struct wl_resource *resource,
++	       int32_t x, int32_t y, int32_t width, int32_t height)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	wl_surface_damage(surface_tunnel_object->proxy, x, y, width, height);
++}
++
++static void
++surface_damage_buffer(struct wl_client *client,
++		      struct wl_resource *resource,
++		      int32_t x, int32_t y, int32_t width, int32_t height)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	wl_surface_damage_buffer(surface_tunnel_object->proxy, x, y, width, height);
++}
++
++static void
++destroy_callback(void *user_data)
++{
++	struct libdecor_gtk4_callback *callback = user_data;
++
++	wl_list_remove(&callback->link);
++	free(callback);
++}
++
++static void
++surface_frame(struct wl_client *client,
++	      struct wl_resource *resource,
++	      uint32_t id)
++
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct wl_resource *callback_resource;
++	struct wl_callback *callback_proxy;
++	struct libdecor_gtk4_tunnel_object *callback_tunnel_object;
++	struct libdecor_gtk4_surface *surface;
++	struct libdecor_gtk4_callback *callback;
++
++	callback_resource =
++		wl_resource_create(client, &wl_callback_interface, 1, id);
++
++	if (!surface_tunnel_object)
++		return;
++
++	surface = surface_tunnel_object->user_data;
++
++	callback_proxy = wl_surface_frame(surface_tunnel_object->proxy);
++
++	callback_tunnel_object =
++		libdecor_gtk4_tunnel_object_new(surface_tunnel_object->tunnels,
++						surface_tunnel_object,
++						callback_proxy, callback_resource);
++	wl_callback_add_listener(callback_proxy,
++				 &wl_callback_listener,
++				 callback_tunnel_object);
++	wl_resource_set_implementation (callback_tunnel_object->resource, NULL,
++					callback_tunnel_object,
++					destroy_wl_callback);
++
++	callback = zalloc(sizeof *callback);
++	callback->tunnel_object = callback_tunnel_object;
++	wl_list_insert(&surface->pending_frame_callbacks, &callback->link);
++	callback_tunnel_object->user_data = callback;
++	callback_tunnel_object->free_user_data = destroy_callback;
++}
++
++static void
++surface_set_opaque_region(struct wl_client *client,
++			  struct wl_resource *resource,
++			  struct wl_resource *region_resource)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_tunnel_object *region =
++		wl_resource_get_user_data(region_resource);
++
++	wl_surface_set_opaque_region(surface_tunnel_object->proxy,
++				     region->proxy);
++}
++
++static void
++surface_set_input_region(struct wl_client *client,
++			 struct wl_resource *resource,
++			 struct wl_resource *region_resource)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_tunnel_object *region =
++		wl_resource_get_user_data(region_resource);
++
++	wl_surface_set_input_region(surface_tunnel_object->proxy, region->proxy);
++}
++
++static void
++surface_commit(struct wl_client *client, struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_surface *surface = surface_tunnel_object->user_data;
++
++	wl_signal_emit(&surface->before_commit_signal, surface);
++	wl_surface_commit(surface_tunnel_object->proxy);
++	wl_signal_emit(&surface->after_commit_signal, surface);
++}
++
++static void
++surface_set_buffer_transform(struct wl_client *client,
++			     struct wl_resource *resource, int transform)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	wl_surface_set_buffer_transform(surface_tunnel_object->proxy, transform);
++}
++
++static void
++surface_set_buffer_scale(struct wl_client *client,
++			 struct wl_resource *resource,
++			 int32_t scale)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	wl_surface_set_buffer_scale(surface_tunnel_object->proxy, scale);
++}
++
++static void
++surface_offset(struct wl_client *client,
++	       struct wl_resource *resource,
++	       int32_t sx,
++	       int32_t sy)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	wl_surface_offset(surface_tunnel_object->proxy, sx, sy);
++}
++
++static const struct wl_surface_interface surface_interface = {
++	surface_destroy,
++	surface_attach,
++	surface_damage,
++	surface_frame,
++	surface_set_opaque_region,
++	surface_set_input_region,
++	surface_commit,
++	surface_set_buffer_transform,
++	surface_set_buffer_scale,
++	surface_damage_buffer,
++	surface_offset,
++};
++
++static void
++destroy_surface(struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_surface *surface = surface_tunnel_object->user_data;
++	struct libdecor_gtk4_tunnel_object *tunnel_object;
++
++	wl_list_for_each(tunnel_object,
++			 &surface_tunnel_object->tunnels->root_tunnel_object->children,
++			 link) {
++		struct libdecor_gtk4_seat *seat;
++
++		if (wl_resource_get_interface(tunnel_object->resource) !=
++		    &wl_seat_interface)
++			continue;
++
++		seat = tunnel_object->user_data;
++		if (!seat)
++			continue;
++
++		if (seat->pointer_focus == surface)
++			seat->pointer_focus = NULL;
++	}
++
++	if (surface->frame_surface)
++		libdecor_gtk4_frame_surface_notify_surface_destroyed(surface->frame_surface);
++
++	libdecor_gtk4_tunnel_object_free(surface_tunnel_object);
++}
++
++static void
++surface_enter(void *data,
++	      struct wl_surface *wl_surface, struct wl_output *wl_output)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object = data;
++	struct libdecor_gtk4_tunnel_object *output =
++		wl_output_get_user_data(wl_output);
++
++	if (!own_output(wl_output))
++		return;
++
++	wl_surface_send_enter(surface_tunnel_object->resource,
++			      output->resource);
++}
++
++static void
++surface_leave(void *data,
++	      struct wl_surface *wl_surface, struct wl_output *wl_output)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object = data;
++	struct libdecor_gtk4_tunnel_object *output =
++		wl_output_get_user_data(wl_output);
++
++	if (!own_output(wl_output))
++		return;
++
++	wl_surface_send_leave(surface_tunnel_object->resource,
++			      output->resource);
++}
++
++static const struct wl_surface_listener surface_listener = {
++	surface_enter,
++	surface_leave
++};
++
++static void
++compositor_create_surface(struct wl_client *client,
++			  struct wl_resource *resource, uint32_t id)
++{
++	struct libdecor_gtk4_tunnel_object *compositor =
++		wl_resource_get_user_data(resource);
++	struct wl_surface *surface_proxy;
++	struct wl_resource *surface_resource;
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object;
++	struct libdecor_gtk4_surface *surface;
++
++	surface_proxy = wl_compositor_create_surface(compositor->proxy);
++	wl_proxy_set_tag((struct wl_proxy *) surface_proxy,
++			 &libdecor_gtk4_proxy_tag);
++	surface_resource =
++		wl_resource_create(client, &wl_surface_interface,
++				   wl_resource_get_version(resource), id);
++	surface_tunnel_object =
++		libdecor_gtk4_tunnel_object_new(compositor->tunnels,
++						compositor,
++						surface_proxy,
++						surface_resource);
++
++	wl_surface_add_listener(surface_proxy, &surface_listener,
++				surface_tunnel_object);
++	wl_resource_set_implementation(surface_resource, &surface_interface,
++				       surface_tunnel_object, destroy_surface);
++
++	surface = zalloc(sizeof *surface);
++	wl_signal_init(&surface->before_commit_signal);
++	wl_signal_init(&surface->after_commit_signal);
++
++	wl_list_init(&surface->pending_frame_callbacks);
++	surface->tunnel_object = surface_tunnel_object;
++	surface_tunnel_object->user_data = surface;
++	surface_tunnel_object->free_user_data = free;
++}
++
++static void
++destroy_region(struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *region =
++		wl_resource_get_user_data(resource);
++
++	libdecor_gtk4_tunnel_object_free(region);
++}
++
++static void
++region_destroy(struct wl_client *client, struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *region =
++		wl_resource_get_user_data(resource);
++
++	wl_region_destroy(region->proxy);
++	wl_resource_destroy(resource);
++}
++
++static void
++region_add(struct wl_client *client, struct wl_resource *resource,
++	   int32_t x, int32_t y, int32_t width, int32_t height)
++{
++	struct libdecor_gtk4_tunnel_object *region =
++		wl_resource_get_user_data(resource);
++
++	wl_region_add(region->proxy, x, y, width, height);
++}
++
++static void
++region_subtract(struct wl_client *client, struct wl_resource *resource,
++		int32_t x, int32_t y, int32_t width, int32_t height)
++{
++	struct libdecor_gtk4_tunnel_object *region =
++		wl_resource_get_user_data(resource);
++
++	wl_region_subtract(region->proxy, x, y, width, height);
++}
++
++static const struct wl_region_interface region_implementation = {
++	region_destroy,
++	region_add,
++	region_subtract
++};
++
++static void
++compositor_create_region(struct wl_client *client,
++			 struct wl_resource *resource, uint32_t id)
++{
++	struct libdecor_gtk4_tunnel_object *compositor =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_tunnel_object *region;
++	struct wl_region *region_proxy;
++	struct wl_resource *region_resource;
++
++	region_proxy = wl_compositor_create_region(compositor->proxy);
++	region_resource =
++		wl_resource_create(client, &wl_region_interface,
++				   wl_resource_get_version(resource), id);
++	region = libdecor_gtk4_tunnel_object_new(compositor->tunnels,
++						 compositor, region_proxy,
++						 region_resource);
++
++	wl_resource_set_implementation(region->resource, &region_implementation,
++				       region, destroy_region);
++}
++
++static const struct wl_compositor_interface compositor_implementation = {
++	compositor_create_surface,
++	compositor_create_region
++};
++
++static void
++destroy_compositor(struct wl_resource *resource)
++{
++	struct libdecor_gtk4_tunnel_object *tunnel_object =
++		wl_resource_get_user_data(resource);
++
++	libdecor_gtk4_tunnel_object_free(tunnel_object);
++}
++
++static void
++bind_compositor(struct wl_client *client,
++		void *data, uint32_t version, uint32_t id)
++{
++	struct libdecor_gtk4_global *global = data;
++	struct libdecor_gtk4_tunnels *tunnels = global->tunnels;
++	struct libdecor_gtk4_tunnel_object *compositor;
++	struct wl_compositor *compositor_proxy;
++	struct wl_resource *compositor_resource;
++
++	compositor_proxy =
++		wl_registry_bind(tunnels->client.wl_registry,
++				 global->name,
++				 &wl_compositor_interface,
++				 version);
++	compositor_resource = wl_resource_create(client, &wl_compositor_interface,
++						 version, id);
++	compositor =
++		libdecor_gtk4_tunnel_object_new(tunnels,
++						tunnels->root_tunnel_object,
++						compositor_proxy,
++						compositor_resource);
++
++	wl_resource_set_implementation(compositor->resource, &compositor_implementation,
++				       compositor, destroy_compositor);
++}
++
++struct libdecor_gtk4_global *
++wl_compositor_new(struct libdecor_gtk4_tunnels *tunnels,
++		  uint32_t name,
++		  uint32_t version)
++{
++	struct libdecor_gtk4_global *global;
++	uint32_t tunneled_version;
++
++	global = zalloc(sizeof *global);
++	tunneled_version = MIN(version, MAX_COMPOSITOR_VERSION);
++	global->tunnels = tunnels;
++	global->name = name;
++	global->wl_global = wl_global_create(tunnels->server.wl_display,
++					     &wl_compositor_interface,
++					     tunneled_version,
++					     global, bind_compositor);
++	wl_list_insert(&tunnels->globals, &global->link);
++
++	return global;
++}
++
++static void
++seat_free(void *user_data)
++{
++	struct libdecor_gtk4_seat *seat = user_data;
++
++	free(seat->name);
++	free(seat);
++}
++
++static bool
++wl_seat_name_filter(struct wl_resource *resource,
++		    const char *name)
++{
++	struct libdecor_gtk4_tunnel_object *tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_seat *seat;
++
++	seat = tunnel_object->user_data;
++	if (!seat) {
++		seat = zalloc(sizeof(*seat));
++		seat->name = strdup(name);
++		tunnel_object->user_data = seat;
++		tunnel_object->free_user_data = seat_free;
++	}
++
++	return false;
++}
++
++static bool
++wl_pointer_enter_filter(struct wl_resource *pointer_resource,
++			uint32_t serial,
++			struct wl_resource *surface_resource,
++			wl_fixed_t x,
++			wl_fixed_t y)
++{
++	struct libdecor_gtk4_tunnel_object *pointer_tunnel_object =
++		wl_resource_get_user_data(pointer_resource);
++	struct libdecor_gtk4_tunnel_object *seat_tunnel_object =
++		pointer_tunnel_object->parent;
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(surface_resource);
++	struct libdecor_gtk4_seat *seat;
++
++	if (!surface_resource)
++		return false;
++
++	if (!own_surface(surface_tunnel_object->proxy))
++		return false;
++
++	seat = seat_tunnel_object->user_data;
++	if (seat) {
++		seat->pointer_focus = surface_tunnel_object->user_data;
++	}
++
++	return false;
++}
++
++static bool
++wl_pointer_leave_filter(struct wl_resource *pointer_resource,
++			uint32_t serial,
++			struct wl_resource *surface_resource)
++{
++	struct libdecor_gtk4_tunnel_object *pointer_tunnel_object =
++		wl_resource_get_user_data(pointer_resource);
++	struct libdecor_gtk4_tunnel_object *seat_tunnel_object =
++		pointer_tunnel_object->parent;
++	struct libdecor_gtk4_seat *seat;
++
++	seat = seat_tunnel_object->user_data;
++	if (seat) {
++		seat->pointer_focus = NULL;
++	}
++	return false;
++}
++
++static bool
++wl_pointer_button_filter(struct wl_resource *resource,
++			 uint32_t serial,
++			 uint32_t time,
++			 uint32_t button,
++			 uint32_t state)
++{
++	struct libdecor_gtk4_tunnel_object *pointer_tunnel_object =
++		wl_resource_get_user_data(resource);
++	struct libdecor_gtk4_tunnel_object *seat_tunnel_object =
++		pointer_tunnel_object->parent;
++	struct libdecor_gtk4_seat *seat;
++
++	seat = seat_tunnel_object->user_data;
++	if (!seat)
++		return false;
++
++	if (!seat->popup_grab)
++		return false;
++
++	if (!state)
++		return false;
++
++	if (seat->filter_next_release == button && !state) {
++		seat->filter_next_release = 0;
++		return true;
++	}
++
++	seat->filter_next_release = button;
++
++	libdecor_frame_dismiss_popup(seat->popup_grab, seat->name);
++	return true;
++}
++
++static void
++registry_handle_global(void *user_data,
++		       struct wl_registry *wl_registry,
++		       uint32_t id,
++		       const char *interface,
++		       uint32_t version)
++{
++	struct libdecor_gtk4_tunnels *tunnels = user_data;
++
++	if (strcmp(interface, "wl_compositor") == 0) {
++		wl_compositor_new(tunnels, id, version);
++	} else if (strcmp(interface, "wl_shm") == 0) {
++		wl_shm_new(tunnels, id, version);
++	} else if (strcmp(interface, "zwp_linux_dmabuf_v1") == 0) {
++		zwp_linux_dmabuf_v1_new(tunnels, id, version);
++	} else if (strcmp(interface, "wl_drm") == 0) {
++		wl_drm_new(tunnels, id, version);
++	} else if (strcmp(interface, "wl_seat") == 0) {
++		wl_seat_new(tunnels, id, version);
++	} else if (strcmp(interface, "zwp_tablet_manager_v2") == 0) {
++		zwp_tablet_manager_v2_new(tunnels, id, version);
++	} else if (strcmp(interface, "wl_data_device_manager") == 0) {
++		wl_data_device_manager_new(tunnels, id, version);
++	} else if (strcmp(interface, "wl_output") == 0) {
++		wl_output_new(tunnels, id, version);
++	} else if (strcmp(interface, "wp_cursor_shape_manager_v1") == 0) {
++		wp_cursor_shape_manager_v1_new(tunnels, id, version);
++	} else if (strcmp(interface, "wl_fixes") == 0) {
++		wl_fixes_new(tunnels, id, version);
++	}
++}
++
++static void
++registry_handle_global_remove(void *user_data,
++			      struct wl_registry *wl_registry,
++			      uint32_t name)
++{
++}
++
++static const struct wl_registry_listener registry_listener = {
++	registry_handle_global,
++	registry_handle_global_remove
++};
++
++struct libdecor_gtk4_tunnels *
++libdecor_gtk4_tunnels_new(struct libdecor_plugin_gtk4 *plugin_gtk4,
++			  struct wl_display *client_wl_display,
++			  struct wl_display *server_wl_display)
++{
++	struct libdecor_gtk4_tunnels *tunnels;
++
++	tunnels = zalloc(sizeof *tunnels);
++	tunnels->plugin_gtk4 = plugin_gtk4;
++	tunnels->client.wl_display = client_wl_display;
++
++	wl_list_init(&tunnels->globals);
++
++	tunnels->root_tunnel_object =
++		libdecor_gtk4_tunnel_object_new(tunnels, NULL, NULL, NULL);
++	tunnels->client.wl_registry = wl_display_get_registry(client_wl_display);
++	wl_registry_set_user_data(tunnels->client.wl_registry,
++				  tunnels->root_tunnel_object);
++	tunnels->server.wl_display = server_wl_display;
++	wl_registry_add_listener(tunnels->client.wl_registry,
++				 &registry_listener,
++				 tunnels);
++
++	tunnels->wl_seat_name_filter = wl_seat_name_filter;
++	tunnels->wl_pointer_enter_filter = wl_pointer_enter_filter;
++	tunnels->wl_pointer_leave_filter = wl_pointer_leave_filter;
++	tunnels->wl_pointer_button_filter = wl_pointer_button_filter;
++
++	return tunnels;
++}
++
++static void
++libdecor_gtk4_tunnel_object_free_tree(struct libdecor_gtk4_tunnel_object *tunnel_object)
++{
++	struct libdecor_gtk4_tunnel_object *child, *tmp;
++
++	wl_list_for_each_safe(child, tmp, &tunnel_object->children, link)
++		libdecor_gtk4_tunnel_object_free_tree(child);
++
++	if (tunnel_object->proxy)
++		wl_proxy_destroy(tunnel_object->proxy);
++
++	if (tunnel_object->resource)
++		wl_resource_destroy(tunnel_object->resource);
++	else
++		libdecor_gtk4_tunnel_object_free(tunnel_object);
++}
++
++void
++libdecor_gtk4_tunnels_free(struct libdecor_gtk4_tunnels *tunnels)
++{
++	struct libdecor_gtk4_global *global, *tmp;
++
++	wl_list_for_each_safe(global, tmp, &tunnels->globals, link)
++		libdecor_gtk4_global_free(global);
++
++	wl_registry_destroy(tunnels->client.wl_registry);
++	libdecor_gtk4_tunnel_object_free_tree(tunnels->root_tunnel_object);
++	free(tunnels);
++}
+diff --git a/src/plugins/gtk4/libdecor-gtk4.c b/src/plugins/gtk4/libdecor-gtk4.c
+new file mode 100644
+index 0000000..99671e5
+--- /dev/null
++++ b/src/plugins/gtk4/libdecor-gtk4.c
+@@ -0,0 +1,1738 @@
++/*
++ * Copyright © 2026 Red Hat Inc.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#include "config.h"
++
++#include <assert.h>
++#include <errno.h>
++#include <poll.h>
++#include <signal.h>
++#include <stdio.h>
++#include <sys/epoll.h>
++#include <sys/fcntl.h>
++#include <sys/poll.h>
++#include <sys/socket.h>
++#include <sys/syscall.h>
++#include <sys/wait.h>
++#include <unistd.h>
++#include <wayland-client.h>
++#include <wayland-server.h>
++
++#include "common/libdecor-process-utils.h"
++#include "common/libdecor-os-utils.h"
++#include "libdecor-gtk4.h"
++#include "libdecor-plugin.h"
++#include "utils.h"
++
++#include "xdg-shell-client-protocol.h"
++#include "xdg-shell-server-protocol.h"
++#include "libdecor-shell-server-protocol.h"
++
++#define XDG_WM_BASE_VERSION 3
++#define LIBDECOR_SHELL_VERSION 1
++
++struct dispatch_state {
++	bool read_client_display;
++	int dispatch_count;
++	int dispatch_errno;
++};
++
++struct dispatcher {
++	void (* dispatch)(void *user_data, int events, struct dispatch_state *state);
++	void (* skip)(void *user_data, struct dispatch_state *state);
++	void *user_data;
++	struct wl_list link;
++};
++
++struct libdecor_frame_gtk4 {
++	struct libdecor_frame frame;
++
++	struct libdecor_plugin_gtk4 *plugin_gtk4;
++
++	uint32_t serial;
++
++	struct libdecor_gtk4_frame_surface *frame_surface;
++
++	struct wl_list link;
++
++	char *title;
++};
++
++struct libdecor_plugin_gtk4 {
++	struct libdecor_plugin plugin;
++
++	struct libdecor *context;
++
++	int epoll_fd;
++	struct wl_list dispatchers;
++
++	struct {
++		struct wl_subcompositor *wl_subcompositor;
++		struct wl_display *wl_display;
++		struct wl_event_queue *wl_event_queue;
++		struct wl_registry *wl_registry;
++		bool plugin_queue_only;
++		bool prepared_to_read;
++	} client;
++
++	struct {
++		struct wl_display *wl_display;
++		struct wl_global *xdg_wm_base;
++		struct wl_global *libdecor_shell;
++	} server;
++
++	struct {
++		struct wl_resource *resource;
++		bool ready;
++	} shell;
++
++	struct libdecor_gtk4_tunnels *tunnels;
++
++	struct wl_list pending_frames;
++
++	struct wl_client *wl_client;
++	int client_pidfd;
++	pid_t client_pid;
++
++	bool init_failed;
++
++	uint32_t titlebar_height;
++};
++
++struct frame_surface_state {
++	uint32_t acked_configure_serial;
++	int content_area_x;
++	int content_area_y;
++	int content_area_width;
++	int content_area_height;
++	int window_geometry_x;
++	int window_geometry_y;
++	int surface_width;
++	int surface_height;
++};
++
++struct libdecor_gtk4_frame_surface {
++	int ref_count;
++
++	struct libdecor_plugin_gtk4 *plugin_gtk4;
++	struct libdecor_frame_gtk4 *frame_gtk4;
++
++	struct libdecor_gtk4_surface *surface;
++
++	struct {
++		struct wl_resource *xdg_surface_resource;
++		struct wl_resource *xdg_toplevel_resource;
++		struct wl_resource *shell_surface_resource;
++	} server;
++
++	struct {
++		struct wl_subsurface *subsurface;
++	} client;
++
++	uint32_t last_sent_configure_serial;
++
++	struct wl_listener before_commit_listener;
++	struct wl_listener after_commit_listener;
++
++	struct frame_surface_state pending_state;
++	struct frame_surface_state current_state;
++	int subsurface_x;
++	int subsurface_y;
++
++	bool is_sync;
++	bool in_commit;
++};
++
++static void
++dispatch_pending_frame_callbacks(struct libdecor_gtk4_frame_surface *frame_surface);
++
++static void
++set_string(char **string_location,
++	   const char *new_string)
++{
++	free(*string_location);
++	*string_location = strdup(new_string);
++}
++
++static int
++libdecor_pidfd_send_signal(int pidfd, int sig, siginfo_t *info,
++			   unsigned int flags)
++{
++	return syscall(SYS_pidfd_send_signal, pidfd, sig, info, flags);
++}
++
++static void
++libdecor_plugin_gtk4_destroy(struct libdecor_plugin *plugin)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 =
++		(struct libdecor_plugin_gtk4 *) plugin;
++	struct dispatcher *dispatcher, *tmp;
++
++	wl_list_for_each_safe(dispatcher, tmp, &plugin_gtk4->dispatchers, link)
++		free(dispatcher);
++
++	if (plugin_gtk4->client_pidfd >= 0) {
++		siginfo_t siginfo = {};
++
++		if (libdecor_pidfd_send_signal(plugin_gtk4->client_pidfd,
++					       SIGTERM, NULL, 0) != 0) {
++			fprintf(stderr,
++				"libdecor-WARNING: "
++				"Failed to terminate client with pidfd (%s), "
++				"trying pid.\n",
++				strerror(errno));
++			kill(plugin_gtk4->client_pid, SIGTERM);
++		}
++		waitid(P_PIDFD, plugin_gtk4->client_pidfd, &siginfo, WEXITED);
++	}
++
++	if (plugin_gtk4->epoll_fd > 0)
++		close(plugin_gtk4->epoll_fd);
++
++	libdecor_gtk4_tunnels_free(plugin_gtk4->tunnels);
++
++	if (plugin_gtk4->wl_client)
++		wl_client_destroy(plugin_gtk4->wl_client);
++
++	if (plugin_gtk4->client.wl_subcompositor)
++		wl_subcompositor_destroy(plugin_gtk4->client.wl_subcompositor);
++	if (plugin_gtk4->client.wl_registry)
++		wl_registry_destroy(plugin_gtk4->client.wl_registry);
++	wl_proxy_wrapper_destroy(plugin_gtk4->client.wl_display);
++	wl_event_queue_destroy(plugin_gtk4->client.wl_event_queue);
++
++	if (plugin_gtk4->server.wl_display)
++		wl_display_destroy(plugin_gtk4->server.wl_display);
++
++	libdecor_plugin_release(&plugin_gtk4->plugin);
++	free(plugin_gtk4);
++}
++
++static int
++libdecor_plugin_gtk4_get_fd(struct libdecor_plugin *plugin)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 =
++		(struct libdecor_plugin_gtk4 *) plugin;
++
++	return plugin_gtk4->epoll_fd;
++}
++
++static void
++dispatch_event_loop(void *data, int events, struct dispatch_state *state)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
++	struct wl_event_loop *event_loop;
++
++	event_loop = wl_display_get_event_loop(plugin_gtk4->server.wl_display);
++	if (wl_event_loop_dispatch(event_loop, 0) != 0) {
++		fprintf(stderr, "libdecor-ERROR: Failed to dispatch event loop: %s\n",
++			strerror(errno));
++		exit(EXIT_FAILURE);
++	}
++}
++
++static int
++prepare_client_display(struct libdecor_plugin_gtk4 *plugin_gtk4,
++		       struct dispatch_state *state)
++{
++	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
++	struct wl_event_queue *plugin_queue;
++
++	plugin_queue = plugin_gtk4->client.wl_event_queue;
++
++	while (true) {
++		int count;
++
++		if (wl_display_prepare_read_queue(wl_display, plugin_queue) != 0)
++			goto dispatch_pending;
++
++		if (!plugin_gtk4->client.plugin_queue_only) {
++			if (wl_display_prepare_read(wl_display) != 0) {
++				wl_display_cancel_read(wl_display);
++				goto dispatch_pending;
++			}
++		}
++
++		break;
++dispatch_pending:
++		count = wl_display_dispatch_queue_pending(wl_display, plugin_queue);
++		if (count == -1)
++			break;
++		state->dispatch_count += count;
++
++		if (!plugin_gtk4->client.plugin_queue_only) {
++			count = wl_display_dispatch_pending(wl_display);
++			if (count == -1) {
++				fprintf(stderr,
++					"libdecor-ERROR: Failed to dispatch Wayland queue: %s\n",
++					strerror(errno));
++
++				break;
++			}
++			state->dispatch_count += count;
++		}
++	}
++
++	plugin_gtk4->client.prepared_to_read = true;
++
++	if (wl_display_get_error(wl_display) == 0)
++		return 0;
++	else
++		return -1;
++}
++
++static void
++dispatch_client_display(void *data, int events, struct dispatch_state *state)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
++	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
++	struct wl_event_queue *plugin_queue;
++	int ret;
++
++	if (events & EPOLLIN) {
++		if (!plugin_gtk4->client.plugin_queue_only)
++			wl_display_cancel_read(wl_display);
++		if (wl_display_read_events(wl_display) != 0) {
++			state->dispatch_errno = errno;
++			return;
++		}
++	} else {
++		wl_display_cancel_read(wl_display);
++		if (!plugin_gtk4->client.plugin_queue_only)
++			wl_display_cancel_read(wl_display);
++	}
++
++	plugin_gtk4->client.prepared_to_read = false;
++
++	plugin_queue = plugin_gtk4->client.wl_event_queue;
++	ret = wl_display_dispatch_queue_pending(wl_display, plugin_queue);
++	if (ret == -1) {
++		state->dispatch_errno = errno;
++		return;
++	}
++	state->dispatch_count += ret;
++
++	if (!plugin_gtk4->client.plugin_queue_only) {
++		ret = wl_display_dispatch_pending(wl_display);
++		if (ret == -1) {
++			state->dispatch_errno = errno;
++			return;
++		}
++		state->dispatch_count += ret;
++	}
++}
++
++static void
++skip_client_display(void *data, struct dispatch_state *state)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
++	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
++
++	if (plugin_gtk4->client.prepared_to_read) {
++		wl_display_cancel_read(wl_display);
++		if (!plugin_gtk4->client.plugin_queue_only)
++			wl_display_cancel_read(wl_display);
++		plugin_gtk4->client.prepared_to_read = false;
++	}
++}
++
++static int
++libdecor_plugin_gtk4_dispatch(struct libdecor_plugin *plugin,
++			      int timeout)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 =
++		(struct libdecor_plugin_gtk4 *) plugin;
++	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
++	struct epoll_event ep[16] = {};
++	int count;
++	int i;
++	struct dispatch_state state = {};
++
++	if (prepare_client_display(plugin_gtk4, &state) != 0)
++		return -errno;
++
++	wl_display_flush_clients(plugin_gtk4->server.wl_display);
++
++	if (wl_display_flush(wl_display) < 0)
++		return -errno;
++
++	count = epoll_wait(plugin_gtk4->epoll_fd, ep, ARRAY_LENGTH(ep), timeout);
++	struct dispatcher *dispatcher;
++	wl_list_for_each(dispatcher, &plugin_gtk4->dispatchers, link) {
++		for (i = 0; i < count; i++) {
++			struct dispatcher *ready_dispatcher = ep[i].data.ptr;
++
++			if (ready_dispatcher == dispatcher)
++				break;
++		}
++		if (i == count) {
++			if (dispatcher->skip)
++				dispatcher->skip(dispatcher->user_data, &state);
++			continue;
++		}
++
++		dispatcher->dispatch(dispatcher->user_data, ep[i].events, &state);
++	}
++
++	if (state.dispatch_errno) {
++		errno = state.dispatch_errno;
++		return -errno;
++	}
++
++	return state.dispatch_count;
++}
++
++static void
++dispatch_plugin_only(struct libdecor_plugin_gtk4 *plugin_gtk4)
++{
++	plugin_gtk4->client.plugin_queue_only = true;
++	libdecor_plugin_gtk4_dispatch(&plugin_gtk4->plugin, -1);
++	plugin_gtk4->client.plugin_queue_only = false;
++}
++
++static void
++handle_surface_before_commit(struct wl_listener *listener, void *data)
++{
++}
++
++static void
++handle_surface_after_commit(struct wl_listener *listener, void *data)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface =
++		wl_container_of(listener, frame_surface,
++				after_commit_listener);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++	
++	frame_surface->current_state = frame_surface->pending_state;
++
++	if (frame && frame_surface->is_sync && !frame_surface->in_commit)
++		libdecor_frame_toplevel_commit(frame);
++}
++
++static struct libdecor_gtk4_frame_surface *
++libdecor_gtk4_frame_surface_new(struct libdecor_gtk4_surface *surface)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface;
++
++	frame_surface = zalloc(sizeof *frame_surface);
++	frame_surface->ref_count = 1;
++	frame_surface->surface = surface;
++	frame_surface->is_sync = true;
++
++	frame_surface->before_commit_listener.notify = handle_surface_before_commit;
++	wl_signal_add(&surface->before_commit_signal,
++		      &frame_surface->before_commit_listener);
++	frame_surface->after_commit_listener.notify = handle_surface_after_commit;
++	wl_signal_add(&surface->after_commit_signal,
++		      &frame_surface->after_commit_listener);
++
++	frame_surface->plugin_gtk4 = surface->tunnel_object->tunnels->plugin_gtk4;
++
++	surface->frame_surface = frame_surface;
++
++	return frame_surface;
++}
++
++static struct libdecor_gtk4_frame_surface *
++libdecor_gtk4_frame_surface_ref(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	frame_surface->ref_count++;
++	return frame_surface;
++}
++
++static void
++libdecor_gtk4_frame_surface_unref(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	frame_surface->ref_count--;
++	if (frame_surface->ref_count == 0) {
++		assert(!frame_surface->server.shell_surface_resource);
++		assert(!frame_surface->server.xdg_surface_resource);
++		assert(!frame_surface->server.xdg_toplevel_resource);
++		free(frame_surface);
++	}
++}
++
++void
++libdecor_gtk4_frame_surface_notify_surface_destroyed(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	frame_surface->surface = NULL;
++}
++
++static struct libdecor_frame_gtk4 *
++libdecor_frame_gtk4_new(struct libdecor_plugin_gtk4 *plugin_gtk4)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4;
++	static uint32_t frame_serial = 0;
++
++	frame_gtk4 = zalloc(sizeof *frame_gtk4);
++	frame_gtk4->plugin_gtk4 = plugin_gtk4;
++	frame_gtk4->serial = ++frame_serial;
++
++	wl_list_insert(&plugin_gtk4->pending_frames, &frame_gtk4->link);
++	libdecor_shell_send_request_frame(plugin_gtk4->shell.resource,
++					  frame_gtk4->serial);
++
++	while (!frame_gtk4->frame_surface)
++		libdecor_plugin_gtk4_dispatch(&plugin_gtk4->plugin, -1);
++
++	return frame_gtk4;
++}
++
++static void
++libdecor_plugin_gtk4_set_handle_application_cursor(struct libdecor_plugin *plugin,
++						  bool handle_cursor)
++{
++}
++
++static struct libdecor_frame *
++libdecor_plugin_gtk4_frame_new(struct libdecor_plugin *plugin)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 =
++		(struct libdecor_plugin_gtk4 *) plugin;
++	struct libdecor_frame_gtk4 *frame_gtk4;
++
++	frame_gtk4 = libdecor_frame_gtk4_new(plugin_gtk4);
++
++	return &frame_gtk4->frame;
++}
++
++static void
++libdecor_plugin_gtk4_frame_free(struct libdecor_plugin *plugin,
++				struct libdecor_frame *frame)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 =
++		(struct libdecor_frame_gtk4 *) frame;
++	struct libdecor_gtk4_frame_surface *frame_surface;
++
++	frame_surface = frame_gtk4->frame_surface;
++	if (frame_surface) {
++		struct wl_resource *resource;
++
++		resource = frame_surface->server.shell_surface_resource;
++		libdecor_shell_surface_send_dismiss(resource);
++		wl_list_remove(&frame_surface->before_commit_listener.link);
++		wl_list_remove(&frame_surface->after_commit_listener.link);
++		frame_surface->frame_gtk4 = NULL;
++		frame_gtk4->frame_surface = NULL;
++
++		while (frame_surface->surface) {
++			dispatch_pending_frame_callbacks(frame_surface);
++			dispatch_plugin_only(frame_gtk4->plugin_gtk4);
++		}
++	}
++
++	wl_list_remove(&frame_gtk4->link);
++	wl_list_init(&frame_gtk4->link);
++	free(frame_gtk4->title);
++	frame_gtk4->title = NULL;
++}
++
++static void
++add_uint32_to_array(struct wl_array *states,
++		    uint32_t value)
++{
++  uint32_t *valuep;
++
++  valuep = wl_array_add(states, sizeof(*valuep));
++  *valuep = value;
++}
++
++static void
++set_states_array(struct wl_array *states,
++		 enum libdecor_window_state window_state)
++{
++	if (window_state & LIBDECOR_WINDOW_STATE_ACTIVE)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_ACTIVATED);
++	if (window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_MAXIMIZED);
++	if (window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_FULLSCREEN);
++	if (window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_TILED_LEFT);
++	if (window_state & LIBDECOR_WINDOW_STATE_TILED_RIGHT)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_TILED_RIGHT);
++	if (window_state & LIBDECOR_WINDOW_STATE_TILED_TOP)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_TILED_TOP);
++	if (window_state & LIBDECOR_WINDOW_STATE_TILED_BOTTOM)
++		add_uint32_to_array(states, XDG_TOPLEVEL_STATE_TILED_BOTTOM);
++}
++
++static struct libdecor_gtk4_frame_surface *
++create_frame_surface(struct libdecor_frame_gtk4 *frame_gtk4)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = frame_gtk4->plugin_gtk4;
++
++	if (frame_gtk4->frame_surface)
++		return frame_gtk4->frame_surface;
++
++	wl_list_insert(&plugin_gtk4->pending_frames, &frame_gtk4->link);
++	libdecor_shell_send_request_frame(plugin_gtk4->shell.resource,
++					  frame_gtk4->serial);
++
++	while (!frame_gtk4->frame_surface)
++		dispatch_plugin_only(plugin_gtk4);
++	return frame_gtk4->frame_surface;
++}
++
++static void
++update_subsurface_position(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	int x;
++	int y; 
++
++	x = -(frame_surface->current_state.content_area_x +
++	      frame_surface->current_state.window_geometry_x);
++	y = -(frame_surface->current_state.content_area_y +
++	      frame_surface->current_state.window_geometry_y);
++
++	if (frame_surface->subsurface_x == x &&
++	    frame_surface->subsurface_y == y)
++		return;
++
++	frame_surface->subsurface_x = x;
++	frame_surface->subsurface_y = y;
++
++	wl_subsurface_set_position(frame_surface->client.subsurface, x, y);
++}
++
++static void
++dispatch_pending_frame_callbacks(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	struct libdecor_gtk4_callback *callback, *tmp;
++
++	wl_list_for_each_safe(callback, tmp,
++			      &frame_surface->surface->pending_frame_callbacks,
++			      link) {
++		wl_callback_send_done(callback->tunnel_object->resource, 0);
++		wl_callback_destroy(callback->tunnel_object->proxy);
++		wl_resource_destroy(callback->tunnel_object->resource);
++	}
++}
++
++static void
++libdecor_plugin_gtk4_frame_commit(struct libdecor_plugin *plugin,
++				  struct libdecor_frame *frame,
++				  struct libdecor_state *state,
++				  struct libdecor_configuration *configuration)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 =
++		(struct libdecor_frame_gtk4 *) frame;
++	struct libdecor_plugin_gtk4 *plugin_gtk4 =
++		(struct libdecor_plugin_gtk4 *) plugin;
++	struct libdecor_gtk4_frame_surface *frame_surface;
++	struct wl_resource *shell_surface;
++	struct wl_array states;
++	enum libdecor_window_state new_window_state;
++	uint32_t pending_configure_serial;
++	int width = 0, height = 0;
++
++	if (frame_gtk4->frame_surface) {
++		frame_surface = frame_gtk4->frame_surface;
++		shell_surface = frame_surface->server.shell_surface_resource;
++	} else {
++		const char *title;
++
++		frame_surface = create_frame_surface(frame_gtk4);
++		shell_surface = frame_surface->server.shell_surface_resource;
++
++		title = libdecor_frame_get_title(frame);
++		libdecor_shell_surface_send_configure_title(shell_surface, title);
++	}
++
++	frame_surface->in_commit = true;
++
++	wl_array_init(&states);
++	new_window_state = libdecor_frame_get_window_state(frame);
++	set_states_array(&states, new_window_state);
++
++	configuration = libdecor_frame_get_configuration(frame);
++	if (configuration) {
++		libdecor_configuration_get_window_size(configuration,
++						       frame,
++						       &width, &height);
++	}
++
++	if (configuration &&
++	    !libdecor_configuration_is_fixed_size(configuration)) {
++		int content_width, content_height;
++
++		content_width = libdecor_frame_get_content_width(frame);
++		content_height = libdecor_frame_get_content_height(frame);
++		libdecor_shell_surface_send_configure_content(shell_surface,
++							      content_width,
++							      content_height);
++	} else {
++		libdecor_shell_surface_send_configure_content(shell_surface,
++							      0, 0);
++	}
++
++	xdg_toplevel_send_configure(frame_surface->server.xdg_toplevel_resource,
++				    width, height, &states);
++	wl_array_release(&states);
++
++	pending_configure_serial = ++frame_surface->last_sent_configure_serial;
++	xdg_surface_send_configure(frame_surface->server.xdg_surface_resource,
++				   pending_configure_serial);
++
++
++	if (!frame_surface->client.subsurface) {
++		frame_surface->client.subsurface =
++			wl_subcompositor_get_subsurface(plugin_gtk4->client.wl_subcompositor,
++							frame_surface->surface->tunnel_object->proxy,
++							libdecor_frame_get_wl_surface(frame));
++		wl_subsurface_place_below(frame_surface->client.subsurface,
++					  libdecor_frame_get_wl_surface(frame));
++	}
++
++	while (frame_surface->current_state.acked_configure_serial !=
++	       pending_configure_serial) {
++		dispatch_pending_frame_callbacks(frame_surface);
++		dispatch_plugin_only(plugin_gtk4);
++	}
++
++	update_subsurface_position(frame_surface);
++
++	frame_surface->in_commit = false;
++}
++
++static void
++libdecor_plugin_gtk4_frame_property_changed(struct libdecor_plugin *plugin,
++					    struct libdecor_frame *frame)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 =
++		(struct libdecor_frame_gtk4 *) frame;
++	struct libdecor_gtk4_frame_surface *frame_surface = frame_gtk4->frame_surface;
++	struct wl_resource *shell_surface =
++		frame_surface->server.shell_surface_resource;
++	const char *title;
++
++	title = libdecor_frame_get_title(frame);
++	if (libdecor_strcmp0(frame_gtk4->title, title) != 0) {
++		set_string(&frame_gtk4->title, title);
++		libdecor_shell_surface_send_configure_title(shell_surface, title);
++	}
++}
++
++static struct libdecor_gtk4_seat *
++find_seat(struct libdecor_plugin_gtk4 *plugin_gtk4,
++	  const char *name)
++{
++	struct libdecor_gtk4_tunnel_object *tunnel_object;
++
++	wl_list_for_each(tunnel_object,
++			 &plugin_gtk4->tunnels->root_tunnel_object->children,
++			 link) {
++		struct libdecor_gtk4_seat *seat;
++
++		if (wl_resource_get_interface(tunnel_object->resource) !=
++		    &wl_seat_interface)
++			continue;
++
++		seat = tunnel_object->user_data;
++		if (!seat)
++			continue;
++
++		if (strcmp(seat->name, name) == 0)
++			return seat;
++	}
++
++	return NULL;
++}
++
++static void
++libdecor_plugin_gtk4_frame_popup_grab(struct libdecor_plugin *plugin,
++				      struct libdecor_frame *frame,
++				      const char *seat_name)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 =
++		(struct libdecor_frame_gtk4 *) frame;
++	struct libdecor_gtk4_seat *seat;
++
++	seat = find_seat(frame_gtk4->plugin_gtk4, seat_name);
++	if (!seat) {
++		fprintf(stderr,
++			"libdecor-WARNING: Application tried to grab unknown seat\n");
++		return;
++	}
++
++	if (seat->popup_grab) {
++		fprintf(stderr, "libdecor-WARNING: Application "
++			"tried to grab seat twice\n");
++	}
++	seat->popup_grab = frame;
++	return;
++}
++
++static void
++libdecor_plugin_gtk4_frame_popup_ungrab(struct libdecor_plugin *plugin,
++					struct libdecor_frame *frame,
++					const char *seat_name)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 =
++		(struct libdecor_frame_gtk4 *) frame;
++	struct libdecor_gtk4_seat *seat;
++
++	seat = find_seat(frame_gtk4->plugin_gtk4, seat_name);
++	if (!seat) {
++		fprintf(stderr,
++			"libdecor-WARNING: Application tried to grab unknown seat\n");
++		return;
++	}
++
++	if (seat->popup_grab != frame) {
++		fprintf(stderr, "libdecor-WARNING: Application "
++			"tried to grab seat twice\n");
++	}
++	seat->popup_grab = NULL;
++	return;
++}
++
++static bool
++libdecor_plugin_gtk4_frame_get_border_size(struct libdecor_plugin *plugin,
++					   struct libdecor_frame *frame,
++					   struct libdecor_configuration *configuration,
++					   int *left,
++					   int *right,
++					   int *top,
++					   int *bottom)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 =
++		(struct libdecor_frame_gtk4 *) frame;
++	struct libdecor_gtk4_frame_surface *frame_surface = frame_gtk4->frame_surface;
++	enum libdecor_window_state window_state;
++
++	if (configuration) {
++		if (!libdecor_configuration_get_window_state(
++			    configuration, &window_state))
++			return false;
++	} else {
++		window_state = libdecor_frame_get_window_state(frame);
++	}
++
++	if (window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN) {
++		if (left)
++			*left = 0;
++		if (right)
++			*right = 0;
++		if (top)
++			*top = 0;
++		if (bottom)
++			*bottom = 0;
++	} else {
++		if (left)
++			*left = 0;
++		if (right)
++			*right = 0;
++		if (top)
++			*top = frame_surface->plugin_gtk4->titlebar_height;
++		if (bottom)
++			*bottom = 0;
++	}
++
++	return true;
++}
++
++static struct libdecor_plugin_interface gtk4_plugin_iface = {
++	.destroy = libdecor_plugin_gtk4_destroy,
++	.get_fd = libdecor_plugin_gtk4_get_fd,
++	.dispatch = libdecor_plugin_gtk4_dispatch,
++
++	.set_handle_application_cursor = libdecor_plugin_gtk4_set_handle_application_cursor,
++
++	.frame_new = libdecor_plugin_gtk4_frame_new,
++	.frame_free = libdecor_plugin_gtk4_frame_free,
++	.frame_commit = libdecor_plugin_gtk4_frame_commit,
++	.frame_property_changed = libdecor_plugin_gtk4_frame_property_changed,
++	.frame_popup_grab = libdecor_plugin_gtk4_frame_popup_grab,
++	.frame_popup_ungrab = libdecor_plugin_gtk4_frame_popup_ungrab,
++	.frame_get_border_size = libdecor_plugin_gtk4_frame_get_border_size,
++};
++
++static void
++destroy_xdg_toplevel(struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++
++	frame_surface->server.xdg_toplevel_resource = NULL;
++	libdecor_gtk4_frame_surface_unref(frame_surface);
++}
++
++static void
++xdg_toplevel_handle_destroy(struct wl_client *client,
++			    struct wl_resource *resource)
++{
++	wl_resource_destroy(resource);
++}
++
++static void
++xdg_toplevel_handle_set_parent(struct wl_client *client,
++			       struct wl_resource *resource,
++			       struct wl_resource *parent)
++{
++	/* Ignore */
++}
++
++static void
++xdg_toplevel_handle_set_title(struct wl_client *client,
++			      struct wl_resource *resource,
++			      const char *title)
++{
++	/* Ignore */
++}
++
++static void
++xdg_toplevel_handle_set_app_id(struct wl_client *client,
++			       struct wl_resource *resource,
++			       const char *app_id)
++{
++	/* Ignore */
++}
++
++static void
++xdg_toplevel_handle_show_window_menu(struct wl_client *client,
++				     struct wl_resource *resource,
++				     struct wl_resource *seat_resource,
++				     uint32_t serial,
++				     int32_t x,
++				     int32_t y)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++	struct libdecor_gtk4_tunnel_object *seat = wl_resource_get_user_data(seat_resource);
++
++	x -= (frame_surface->current_state.content_area_x +
++	      frame_surface->current_state.window_geometry_x);
++	y -= (frame_surface->current_state.content_area_y +
++	      frame_surface->current_state.window_geometry_y);
++
++	libdecor_frame_show_window_menu(frame,
++					seat->proxy, serial,
++					x, y);
++}
++
++static void
++xdg_toplevel_handle_move(struct wl_client *client,
++			 struct wl_resource *resource,
++			 struct wl_resource *seat_resource,
++			 uint32_t serial)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++	struct libdecor_gtk4_tunnel_object *seat = wl_resource_get_user_data(seat_resource);
++
++	libdecor_frame_move(frame, seat->proxy, serial);
++}
++
++enum libdecor_resize_edge
++xdg_edge_to_edge(enum xdg_toplevel_resize_edge xdg_edge)
++{
++	switch (xdg_edge) {
++	case XDG_TOPLEVEL_RESIZE_EDGE_NONE:
++		return LIBDECOR_RESIZE_EDGE_NONE;
++	case XDG_TOPLEVEL_RESIZE_EDGE_TOP:
++		return LIBDECOR_RESIZE_EDGE_TOP;
++	case XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM:
++		return LIBDECOR_RESIZE_EDGE_BOTTOM;
++	case XDG_TOPLEVEL_RESIZE_EDGE_LEFT:
++		return LIBDECOR_RESIZE_EDGE_LEFT;
++	case XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT:
++		return LIBDECOR_RESIZE_EDGE_TOP_LEFT;
++	case XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT:
++		return LIBDECOR_RESIZE_EDGE_BOTTOM_LEFT;
++	case XDG_TOPLEVEL_RESIZE_EDGE_RIGHT:
++		return LIBDECOR_RESIZE_EDGE_RIGHT;
++	case XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT:
++		return LIBDECOR_RESIZE_EDGE_TOP_RIGHT;
++	case XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT:
++		return LIBDECOR_RESIZE_EDGE_BOTTOM_RIGHT;
++	}
++
++	abort();
++}
++
++static void
++xdg_toplevel_handle_resize(struct wl_client *client,
++			   struct wl_resource *resource,
++			   struct wl_resource *seat_resource,
++			   uint32_t serial,
++			   uint32_t xdg_edge)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++	struct libdecor_gtk4_tunnel_object *seat = wl_resource_get_user_data(seat_resource);
++	enum libdecor_resize_edge edge = xdg_edge_to_edge(xdg_edge);
++
++	libdecor_frame_resize(frame, seat->proxy, serial, edge);
++}
++
++static void
++xdg_toplevel_handle_set_max_size(struct wl_client *client,
++				 struct wl_resource *resource,
++				 int32_t width,
++				 int32_t height)
++{
++	/* Ignore */
++}
++
++static void
++xdg_toplevel_handle_set_min_size(struct wl_client *client,
++				 struct wl_resource *resource,
++				 int32_t width,
++				 int32_t height)
++{
++	/* Ignore */
++}
++
++static void
++xdg_toplevel_handle_set_maximized(struct wl_client *client,
++				  struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++
++	libdecor_frame_set_maximized(frame);
++}
++
++static void
++xdg_toplevel_handle_unset_maximized(struct wl_client *client,
++				    struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++
++	libdecor_frame_unset_maximized(frame);
++}
++
++static void
++xdg_toplevel_handle_set_fullscreen(struct wl_client *client,
++				   struct wl_resource *resource,
++				   struct wl_resource *output_resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++	struct libdecor_gtk4_tunnel_object *output = NULL;
++
++	if (output_resource)
++		output = wl_resource_get_user_data(output_resource);
++
++	libdecor_frame_set_fullscreen(frame, output ? output->proxy : NULL);
++}
++
++static void
++xdg_toplevel_handle_unset_fullscreen(struct wl_client *client,
++				     struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++
++	libdecor_frame_unset_fullscreen(frame);
++}
++
++static void
++xdg_toplevel_handle_set_minimized(struct wl_client *client,
++				  struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++
++	libdecor_frame_set_minimized(frame);
++}
++
++static const struct xdg_toplevel_interface xdg_toplevel_implementation = {
++	.destroy = xdg_toplevel_handle_destroy,
++	.set_parent = xdg_toplevel_handle_set_parent,
++	.set_title = xdg_toplevel_handle_set_title,
++	.set_app_id = xdg_toplevel_handle_set_app_id,
++	.show_window_menu = xdg_toplevel_handle_show_window_menu,
++	.move = xdg_toplevel_handle_move,
++	.resize = xdg_toplevel_handle_resize,
++	.set_max_size = xdg_toplevel_handle_set_max_size,
++	.set_min_size = xdg_toplevel_handle_set_min_size,
++	.set_maximized = xdg_toplevel_handle_set_maximized,
++	.unset_maximized = xdg_toplevel_handle_unset_maximized,
++	.set_fullscreen = xdg_toplevel_handle_set_fullscreen,
++	.unset_fullscreen = xdg_toplevel_handle_unset_fullscreen,
++	.set_minimized = xdg_toplevel_handle_set_minimized,
++};
++
++static void
++destroy_xdg_surface(struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++
++	frame_surface->server.xdg_surface_resource = NULL;
++	libdecor_gtk4_frame_surface_unref(frame_surface);
++}
++
++static void
++xdg_surface_handle_destroy(struct wl_client *wl_client,
++			   struct wl_resource *resource)
++{
++	wl_resource_destroy(resource);
++}
++
++static void
++xdg_surface_handle_get_toplevel(struct wl_client *wl_client,
++				struct wl_resource *resource,
++				uint32_t id)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface =
++		wl_resource_get_user_data(resource);
++
++	frame_surface->server.xdg_toplevel_resource =
++		wl_resource_create(wl_client, &xdg_toplevel_interface,
++				   wl_resource_get_version(resource),
++				   id);
++	wl_resource_set_implementation(frame_surface->server.xdg_toplevel_resource,
++				       &xdg_toplevel_implementation,
++				       libdecor_gtk4_frame_surface_ref (frame_surface),
++				       destroy_xdg_toplevel);
++}
++
++static void
++xdg_surface_handle_get_popup(struct wl_client *wl_client,
++			     struct wl_resource *resource,
++			     uint32_t id,
++			     struct wl_resource *parent_resource,
++			     struct wl_resource *positioner_resource)
++{
++	struct wl_resource *xdg_popup_resource;
++
++	xdg_popup_resource =
++		wl_resource_create(wl_client, NULL,
++				   wl_resource_get_version(resource),
++				   id);
++	xdg_popup_send_popup_done(xdg_popup_resource);
++	wl_resource_destroy(xdg_popup_resource);
++}
++
++static void
++xdg_surface_handle_set_window_geometry(struct wl_client *wl_client,
++				       struct wl_resource *resource,
++				       int32_t x, int32_t y,
++				       int32_t width, int32_t height)
++{
++	/* Ignore */
++}
++
++static void
++xdg_surface_handle_ack_configure(struct wl_client *wl_client,
++				 struct wl_resource *resource,
++				 uint32_t serial)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface =
++		wl_resource_get_user_data(resource);
++
++	frame_surface->pending_state.acked_configure_serial = serial;
++}
++
++static const struct xdg_surface_interface xdg_surface_implementation = {
++	.destroy = xdg_surface_handle_destroy,
++	.get_toplevel = xdg_surface_handle_get_toplevel,
++	.get_popup = xdg_surface_handle_get_popup,
++	.set_window_geometry = xdg_surface_handle_set_window_geometry,
++	.ack_configure = xdg_surface_handle_ack_configure,
++};
++
++static void
++destroy_xdg_wm_base(struct wl_resource *resource)
++{
++}
++
++static void
++xdg_wm_base_handle_destroy(struct wl_client *wl_client,
++			   struct wl_resource *resource)
++{
++	wl_resource_destroy(resource);
++}
++
++static void
++xdg_wm_base_handle_create_positioner(struct wl_client *wl_client,
++				     struct wl_resource *resource,
++				     uint32_t id)
++{
++}
++
++static void
++xdg_wm_base_handle_get_xdg_surface(struct wl_client *wl_client,
++				   struct wl_resource *xdg_wm_base_resource,
++				   uint32_t id,
++				   struct wl_resource *surface_resource)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(surface_resource);
++	struct libdecor_gtk4_surface *surface = surface_tunnel_object->user_data;
++	struct libdecor_gtk4_frame_surface *frame_surface;
++
++	frame_surface = libdecor_gtk4_frame_surface_new(surface);
++
++	frame_surface->server.xdg_surface_resource =
++		wl_resource_create(wl_client, &xdg_surface_interface,
++				   wl_resource_get_version(xdg_wm_base_resource),
++				   id);
++	wl_resource_set_implementation(frame_surface->server.xdg_surface_resource,
++				       &xdg_surface_implementation,
++				       frame_surface, destroy_xdg_surface);
++}
++
++static void
++xdg_wm_base_handle_pong(struct wl_client *wl_client,
++			struct wl_resource *resource,
++			uint32_t serial)
++{
++}
++
++static const struct xdg_wm_base_interface xdg_wm_base_implementation = {
++	.destroy = xdg_wm_base_handle_destroy,
++	.create_positioner = xdg_wm_base_handle_create_positioner,
++	.get_xdg_surface = xdg_wm_base_handle_get_xdg_surface,
++	.pong = xdg_wm_base_handle_pong,
++};
++
++static void
++bind_xdg_wm_base(struct wl_client *client,
++		 void *data, uint32_t version, uint32_t id)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
++	struct wl_resource *resource;
++
++	resource = wl_resource_create(client, &xdg_wm_base_interface,
++				      version, id);
++	wl_resource_set_implementation(resource, &xdg_wm_base_implementation,
++				       plugin_gtk4, destroy_xdg_wm_base);
++}
++
++static void
++registry_handle_global(void *user_data,
++		       struct wl_registry *wl_registry,
++		       uint32_t id,
++		       const char *interface,
++		       uint32_t version)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = user_data;
++
++	if (strcmp(interface, "wl_subcompositor") == 0) {
++		plugin_gtk4->client.wl_subcompositor =
++			wl_registry_bind(wl_registry, id,
++					 &wl_subcompositor_interface, 1);
++	}
++}
++
++static void
++registry_handle_global_remove(void *user_data,
++			      struct wl_registry *wl_registry,
++			      uint32_t name)
++{
++}
++
++static const struct wl_registry_listener registry_listener = {
++	registry_handle_global,
++	registry_handle_global_remove
++};
++
++static void
++libdecor_shell_handle_ready(struct wl_client *client,
++			   struct wl_resource *resource)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = wl_resource_get_user_data(resource);
++
++	plugin_gtk4->shell.ready = true;
++}
++
++static void
++sync_handler_handle_callback_done(void *data,
++				  struct wl_callback *callback,
++				  uint32_t serial)
++{
++	struct wl_resource *callback_resource = data;
++
++	wl_callback_send_done(callback_resource, serial);
++	wl_resource_destroy(callback_resource);
++	wl_callback_destroy(callback);
++}
++
++static const struct wl_callback_listener sync_handler_callback_listener = {
++  sync_handler_handle_callback_done
++};
++
++static void
++libdecor_shell_handle_sync(struct wl_client *client,
++			   struct wl_resource *resource,
++			   uint32_t id)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = wl_resource_get_user_data(resource);
++	struct wl_display *client_wl_display = plugin_gtk4->client.wl_display;
++	struct wl_resource *callback_resource;
++	struct wl_callback *callback_proxy;
++
++	callback_resource = wl_resource_create(client, &wl_callback_interface, 1, id);
++	callback_proxy = wl_display_sync(client_wl_display);
++	wl_callback_add_listener(callback_proxy,
++				 &sync_handler_callback_listener,
++				 callback_resource);
++}
++
++static void
++destroy_frame_surface(struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++
++	frame_surface->server.shell_surface_resource = NULL;
++	if (frame_surface->client.subsurface)
++		wl_subsurface_destroy(frame_surface->client.subsurface);
++	libdecor_gtk4_frame_surface_unref(frame_surface);
++}
++
++static void
++libdecor_shell_surface_handle_destroy(struct wl_client *wl_client,
++				      struct wl_resource *resource)
++{
++	wl_resource_destroy(resource);
++}
++
++static void
++libdecor_shell_surface_handle_close(struct wl_client *wl_client,
++				    struct wl_resource *resource)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	struct libdecor_frame *frame = &frame_surface->frame_gtk4->frame;
++
++	libdecor_frame_close(frame);
++}
++
++static bool
++frame_surface_state_equals(struct frame_surface_state *state1,
++			   struct frame_surface_state *state2)
++{
++	return (state1->content_area_x == state2->content_area_x &&
++		state1->content_area_y == state2->content_area_y &&
++		state1->content_area_width == state2->content_area_width &&
++		state1->content_area_height == state2->content_area_height &&
++		state1->window_geometry_x == state2->window_geometry_x &&
++		state1->window_geometry_y == state2->window_geometry_y &&
++		state1->surface_width == state2->surface_width &&
++		state1->surface_height == state2->surface_height);
++}
++
++static void
++libdecor_shell_surface_handle_set_content_area(struct wl_client *client,
++					       struct wl_resource *resource,
++					       int32_t x,
++					       int32_t y,
++					       int32_t width,
++					       int32_t height,
++					       int32_t window_geometry_x,
++					       int32_t window_geometry_y,
++					       int32_t surface_width,
++					       int32_t surface_height)
++{
++	struct libdecor_gtk4_frame_surface *frame_surface = wl_resource_get_user_data(resource);
++	bool should_sync;
++
++
++	frame_surface->pending_state.content_area_x = x;
++	frame_surface->pending_state.content_area_y = y;
++	frame_surface->pending_state.content_area_width = width;
++	frame_surface->pending_state.content_area_height = height;
++	frame_surface->pending_state.window_geometry_x = window_geometry_x;
++	frame_surface->pending_state.window_geometry_y = window_geometry_y;
++	frame_surface->pending_state.surface_width = surface_width;
++	frame_surface->pending_state.surface_height = surface_height;
++
++	should_sync = !frame_surface_state_equals(&frame_surface->pending_state,
++						  &frame_surface->current_state);
++	if (should_sync != frame_surface->is_sync) {
++		if (should_sync)
++			wl_subsurface_set_sync(frame_surface->client.subsurface);
++		else
++			wl_subsurface_set_desync(frame_surface->client.subsurface);
++		frame_surface->is_sync = should_sync;
++	}
++}
++
++static const struct libdecor_shell_surface_interface
++libdecor_shell_surface_implementation = {
++	.destroy = libdecor_shell_surface_handle_destroy,
++	.close = libdecor_shell_surface_handle_close,
++	.set_content_area = libdecor_shell_surface_handle_set_content_area,
++};
++
++static void
++destroy_libdecor_shell(struct wl_resource *resource)
++{
++}
++
++static struct libdecor_frame_gtk4 *
++find_frame(struct libdecor_plugin_gtk4 *plugin_gtk4,
++	   uint32_t serial)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4;
++
++	wl_list_for_each(frame_gtk4, &plugin_gtk4->pending_frames, link) {
++		if (frame_gtk4->serial == serial) {
++			wl_list_remove(&frame_gtk4->link);
++			wl_list_init(&frame_gtk4->link);
++			return frame_gtk4;
++		}
++	}
++
++	return NULL;
++}
++
++static void
++libdecor_shell_handle_create_frame(struct wl_client *wl_client,
++				   struct wl_resource *resource,
++				   uint32_t id,
++				   uint32_t serial,
++				   struct wl_resource *wl_surface_resource)
++{
++	struct libdecor_gtk4_tunnel_object *surface_tunnel_object =
++		wl_resource_get_user_data(wl_surface_resource);
++	struct libdecor_gtk4_surface *surface = surface_tunnel_object->user_data;
++	struct libdecor_gtk4_frame_surface *frame_surface = surface->frame_surface;
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = frame_surface->plugin_gtk4;
++	struct libdecor_frame_gtk4 *frame_gtk4;
++
++	frame_gtk4 = find_frame(plugin_gtk4, serial);
++	if (!frame_gtk4)
++		return;
++
++	frame_gtk4 = frame_gtk4;
++	frame_gtk4->frame_surface = frame_surface;
++	frame_surface->frame_gtk4 = frame_gtk4;
++
++	frame_surface->server.shell_surface_resource =
++		wl_resource_create(wl_client, &libdecor_shell_surface_interface,
++				   wl_resource_get_version(resource), id);
++	wl_resource_set_implementation(frame_surface->server.shell_surface_resource,
++				       &libdecor_shell_surface_implementation,
++				       libdecor_gtk4_frame_surface_ref (frame_surface),
++				       destroy_frame_surface);
++}
++
++static void
++libdecor_shell_handle_titlebar_geometry(struct wl_client *wl_client,
++					struct wl_resource *resource,
++					uint32_t height)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = wl_resource_get_user_data(resource);
++
++	plugin_gtk4->titlebar_height = height;
++}
++
++static const struct libdecor_shell_interface libdecor_shell_implementation = {
++	.ready = libdecor_shell_handle_ready,
++	.sync = libdecor_shell_handle_sync,
++	.create_frame = libdecor_shell_handle_create_frame,
++	.titlebar_geometry = libdecor_shell_handle_titlebar_geometry,
++};
++
++static void
++bind_libdecor_shell(struct wl_client *client,
++		    void *data, uint32_t version, uint32_t id)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
++
++	assert(!plugin_gtk4->shell.resource);
++
++	plugin_gtk4->shell.resource =
++		wl_resource_create(client, &libdecor_shell_interface, version, id);
++	wl_resource_set_implementation(plugin_gtk4->shell.resource,
++				       &libdecor_shell_implementation,
++				       plugin_gtk4, destroy_libdecor_shell);
++}
++
++static bool
++init_compositor(struct libdecor_plugin_gtk4 *plugin_gtk4)
++{
++	struct wl_display *wl_display = plugin_gtk4->client.wl_display;
++
++	plugin_gtk4->client.wl_registry = wl_display_get_registry(wl_display);
++	wl_registry_add_listener(plugin_gtk4->client.wl_registry,
++				 &registry_listener,
++				 plugin_gtk4);
++
++	plugin_gtk4->server.xdg_wm_base =
++		wl_global_create(plugin_gtk4->server.wl_display,
++				 &xdg_wm_base_interface,
++				 XDG_WM_BASE_VERSION,
++				 plugin_gtk4, bind_xdg_wm_base);
++	plugin_gtk4->server.libdecor_shell =
++		wl_global_create(plugin_gtk4->server.wl_display,
++				 &libdecor_shell_interface,
++				 LIBDECOR_SHELL_VERSION,
++				 plugin_gtk4, bind_libdecor_shell);
++
++	wl_display_roundtrip_queue(libdecor_get_wl_display(plugin_gtk4->context),
++				   plugin_gtk4->client.wl_event_queue);
++	return true;
++}
++
++static char *
++find_client_path(void)
++{
++	char *client_path = NULL;
++	const char *plugin_dir_env;
++	char *all_plugin_dirs = NULL;
++	char *plugin_dir;
++	char *saveptr;
++
++	plugin_dir_env = getenv("LIBDECOR_PLUGIN_DIR");
++	if (!plugin_dir_env) {
++		plugin_dir_env = LIBDECOR_PLUGIN_DIR;
++	}
++
++	all_plugin_dirs = strdup(plugin_dir_env);
++
++	plugin_dir = strtok_r(all_plugin_dirs, ":", &saveptr);
++	while (plugin_dir) {
++		char *path = NULL;
++
++		asprintf(&path, "%s/libdecor-gtk4-client", plugin_dir);
++
++		if (access(path, R_OK | X_OK) == 0) {
++			client_path = path;
++			goto out;
++		} else {
++			free(path);
++		}
++
++		plugin_dir = strtok_r(NULL, ":", &saveptr);
++	}
++
++out:
++	free(all_plugin_dirs);
++	return client_path;
++}
++
++static int
++pidfd_open(pid_t pid, unsigned int flags)
++{
++	return syscall(__NR_pidfd_open, pid, flags);
++}
++
++static void
++dispatch_client_pidfd(void *data, int events, struct dispatch_state *state)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
++
++	if (events & EPOLLIN) {
++		siginfo_t siginfo = {};
++		if (waitid(P_PIDFD, plugin_gtk4->client_pidfd, &siginfo, WEXITED) != 0)
++			exit(EXIT_FAILURE);
++			
++		close(plugin_gtk4->client_pidfd);	
++		plugin_gtk4->client_pidfd = -1;
++		plugin_gtk4->wl_client = NULL;
++		fprintf(stderr, "libdecor-WARNING: Decoration process unexpectedly exited.\n");
++
++		if (!plugin_gtk4->shell.ready)
++			plugin_gtk4->init_failed = true;
++	}
++}
++
++static struct wl_client *
++launch_client(struct libdecor_plugin_gtk4 *plugin_gtk4)
++{
++	char *path;
++	struct custom_env child_env;
++	int fds[2];
++	struct wl_client *client = NULL;
++	char * const *argp;
++	char * const *envp;
++	pid_t pid;
++	struct epoll_event ep;
++	struct dispatcher *pidfd_dispatcher;
++
++	path = find_client_path();
++	if (!path)
++		return NULL;
++
++	libdecor_custom_env_init_from_environ(&child_env);
++	libdecor_custom_env_add_arg(&child_env, path);
++
++	if (libdecor_os_socketpair_cloexec(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
++		fprintf(stderr,
++			"socketpair failed while launching '%s': %s\n",
++			path, strerror(errno));
++		free(path);
++		libdecor_custom_env_fini(&child_env);
++		return NULL;
++	}
++	libdecor_custom_env_set_env_var(&child_env, "WAYLAND_SOCKET", "3");
++
++	argp = libdecor_custom_env_get_argp(&child_env);
++	envp = libdecor_custom_env_get_envp(&child_env);
++
++	pid = fork();
++	switch (pid) {
++	case 0:
++		dup2(fds[1], 3);
++		if (close_range(4, ~0, CLOSE_RANGE_CLOEXEC) != 0) {
++			fprintf(stderr,
++				"Failed to close file descriptor range: %s",
++				strerror(errno));
++			exit(EXIT_FAILURE);
++		}
++
++		execve(argp[0], argp, envp);
++
++		exit(EXIT_FAILURE);
++
++	default:
++		close(fds[1]);
++		client = wl_client_create(plugin_gtk4->server.wl_display, fds[0]);
++		if (!client) {
++			libdecor_custom_env_fini(&child_env);
++			close(fds[0]);
++			fprintf(stderr, "Failed to create wl_client for %s\n", path);
++			free(path);
++			return NULL;
++		}
++
++		plugin_gtk4->client_pidfd = pidfd_open(pid, 0);
++		plugin_gtk4->client_pid = pid;
++		pidfd_dispatcher = zalloc(sizeof(struct dispatcher));
++		pidfd_dispatcher->dispatch = dispatch_client_pidfd;
++		pidfd_dispatcher->user_data = plugin_gtk4;
++		wl_list_insert(&plugin_gtk4->dispatchers,
++			       &pidfd_dispatcher->link);
++
++		ep.events = EPOLLIN;
++		ep.data.ptr = pidfd_dispatcher;
++		epoll_ctl(plugin_gtk4->epoll_fd, EPOLL_CTL_ADD,
++			  plugin_gtk4->client_pidfd,
++			  &ep);
++
++		break;
++
++	case -1:
++		close(fds[0]);
++		close(fds[1]);
++		fprintf(stderr, "libdecor-WARNING: Failed to fork: %s\n",
++			strerror(errno));
++		break;
++	}
++
++	free(path);
++	libdecor_custom_env_fini(&child_env);
++
++	return client;
++}
++
++static struct libdecor_plugin *
++libdecor_plugin_new(struct libdecor *context)
++{
++	struct libdecor_plugin_gtk4 *plugin_gtk4;
++	struct wl_event_loop *event_loop;
++	int fd;
++	struct epoll_event ep;
++	struct dispatcher *event_loop_dispatcher;
++	struct dispatcher *client_display_dispatcher;
++
++	plugin_gtk4 = zalloc(sizeof *plugin_gtk4);
++	libdecor_plugin_init(&plugin_gtk4->plugin,
++			     context,
++			     &gtk4_plugin_iface);
++	plugin_gtk4->context = context;
++
++	plugin_gtk4->client.wl_display =
++		wl_proxy_create_wrapper(libdecor_get_wl_display(context));
++	plugin_gtk4->client.wl_event_queue =
++		wl_display_create_queue_with_name(libdecor_get_wl_display(context),
++						  "libdecor-gtk4");
++	wl_proxy_set_queue((struct wl_proxy *) plugin_gtk4->client.wl_display,
++			   plugin_gtk4->client.wl_event_queue);
++
++	plugin_gtk4->epoll_fd = libdecor_os_epoll_create_cloexec();
++	if (plugin_gtk4->epoll_fd < 0) {
++		libdecor_plugin_gtk4_destroy(&plugin_gtk4->plugin);
++		return NULL;
++	}
++
++	plugin_gtk4->server.wl_display = wl_display_create();
++
++	wl_list_init(&plugin_gtk4->dispatchers);
++
++	event_loop = wl_display_get_event_loop(plugin_gtk4->server.wl_display);
++	fd = wl_event_loop_get_fd(event_loop);
++	event_loop_dispatcher = zalloc(sizeof(struct dispatcher));
++	event_loop_dispatcher->dispatch = dispatch_event_loop;
++	event_loop_dispatcher->user_data = plugin_gtk4;
++	wl_list_insert(&plugin_gtk4->dispatchers,
++		       &event_loop_dispatcher->link);
++	ep.events = EPOLLIN | EPOLLOUT;
++	ep.data.ptr = event_loop_dispatcher;
++	epoll_ctl(plugin_gtk4->epoll_fd, EPOLL_CTL_ADD, fd, &ep);
++
++	client_display_dispatcher = zalloc(sizeof(struct dispatcher));
++	client_display_dispatcher->dispatch = dispatch_client_display;
++	client_display_dispatcher->skip = skip_client_display;
++	client_display_dispatcher->user_data = plugin_gtk4;
++	wl_list_insert(&plugin_gtk4->dispatchers,
++		       &client_display_dispatcher->link);
++	ep.events = EPOLLIN;
++	ep.data.ptr = client_display_dispatcher;
++	epoll_ctl(plugin_gtk4->epoll_fd, EPOLL_CTL_ADD,
++		  wl_display_get_fd(libdecor_get_wl_display(plugin_gtk4->context)),
++		  &ep);
++
++	plugin_gtk4->tunnels =
++		libdecor_gtk4_tunnels_new(plugin_gtk4,
++					  plugin_gtk4->client.wl_display,
++					  plugin_gtk4->server.wl_display);
++	init_compositor(plugin_gtk4);
++	wl_list_init(&plugin_gtk4->pending_frames);
++
++	plugin_gtk4->wl_client = launch_client(plugin_gtk4);
++	if (!plugin_gtk4->wl_client) {
++		libdecor_plugin_gtk4_destroy(&plugin_gtk4->plugin);
++		return NULL;
++	}
++
++	while (!plugin_gtk4->shell.ready && !plugin_gtk4->init_failed) {
++		dispatch_plugin_only(plugin_gtk4);
++	}
++
++	if (plugin_gtk4->init_failed) {
++		libdecor_plugin_gtk4_destroy(&plugin_gtk4->plugin);
++		return NULL;
++	}
++
++	return &plugin_gtk4->plugin;
++}
++
++static struct libdecor_plugin_priority priorities[] = {
++	{ NULL, LIBDECOR_PLUGIN_PRIORITY_HIGH + 100 }
++};
++
++LIBDECOR_EXPORT const struct libdecor_plugin_description
++libdecor_plugin_description = {
++	.api_version = LIBDECOR_PLUGIN_API_VERSION,
++	.capabilities = LIBDECOR_PLUGIN_CAPABILITY_BASE,
++	.description = "libdecor plugin using gtk4",
++	.priorities = priorities,
++	.constructor = libdecor_plugin_new,
++};
+diff --git a/src/plugins/gtk4/libdecor-gtk4.h b/src/plugins/gtk4/libdecor-gtk4.h
+new file mode 100644
+index 0000000..8f05be5
+--- /dev/null
++++ b/src/plugins/gtk4/libdecor-gtk4.h
+@@ -0,0 +1,158 @@
++/*
++ * Copyright © 2022 Red Hat Inc
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial
++ * portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
++ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
++ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ */
++
++#ifndef LIBDECOR_GTK4_H
++#define LIBDECOR_GTK4_H
++
++#include <wayland-client-core.h>
++#include <wayland-server-core.h>
++
++#include "utils.h"
++
++struct wl_surface;
++struct wl_output;
++
++struct libdecor_gtk4_frame_surface;
++
++struct libdecor_gtk4_global {
++	struct libdecor_gtk4_tunnels *tunnels;
++
++	struct wl_list link;
++
++	uint32_t name;
++	struct wl_global *wl_global;
++};
++
++struct libdecor_gtk4_tunnels {
++	struct libdecor_plugin_gtk4 *plugin_gtk4;
++
++	struct {
++		struct wl_display *wl_display;
++		struct wl_registry *wl_registry;
++	} client;
++
++	struct {
++		struct wl_display *wl_display;
++	} server;
++
++	struct wl_list globals;
++
++	struct libdecor_gtk4_tunnel_object *root_tunnel_object;
++
++	bool (* wl_seat_name_filter)(struct wl_resource *resource,
++				     const char *name);
++	bool (* wl_pointer_enter_filter)(struct wl_resource *pointer_resource,
++					 uint32_t serial,
++					 struct wl_resource *surface_resource,
++					 wl_fixed_t x,
++					 wl_fixed_t y);
++	bool (* wl_pointer_leave_filter)(struct wl_resource *pointer_resource,
++					 uint32_t serial,
++					 struct wl_resource *surface_resource);
++	bool (* wl_pointer_button_filter)(struct wl_resource *resource,
++					  uint32_t serial,
++					  uint32_t time,
++					  uint32_t button,
++					  uint32_t state);
++};
++
++struct libdecor_gtk4_tunnel_object {
++	struct libdecor_gtk4_tunnels *tunnels;
++	struct libdecor_gtk4_tunnel_object *parent;
++	struct wl_list link;
++	struct wl_list children;
++	void *proxy;
++	void *resource;
++
++	void *user_data;
++	void (* free_user_data)(void *user_data);
++};
++
++struct libdecor_gtk4_seat {
++	char *name;
++
++	struct libdecor_gtk4_surface *pointer_focus;
++
++	struct libdecor_frame *popup_grab;
++	uint32_t filter_next_release;
++};
++
++struct libdecor_gtk4_surface {
++	struct libdecor_gtk4_tunnel_object *tunnel_object;
++
++	struct libdecor_gtk4_frame_surface *frame_surface;
++	struct wl_signal before_commit_signal;
++	struct wl_signal after_commit_signal;
++
++	struct wl_list pending_frame_callbacks;
++};
++
++struct libdecor_gtk4_callback {
++	struct libdecor_gtk4_tunnel_object *tunnel_object;
++	struct wl_list link;
++};
++
++struct libdecor_gtk4_tunnels *
++libdecor_gtk4_tunnels_new(struct libdecor_plugin_gtk4 *plugin_gtk4,
++			  struct wl_display *client_wl_display,
++			  struct wl_display *server_wl_display);
++
++void
++libdecor_gtk4_tunnels_free(struct libdecor_gtk4_tunnels *tunnels);
++
++struct libdecor_gtk4_tunnel_object *
++libdecor_gtk4_tunnel_object_new(struct libdecor_gtk4_tunnels *tunnels,
++				struct libdecor_gtk4_tunnel_object *parent,
++				void *proxy,
++				struct wl_resource *resource);
++
++void
++libdecor_gtk4_tunnel_object_free(struct libdecor_gtk4_tunnel_object *object);
++
++void
++libdecor_gtk4_frame_surface_notify_surface_destroyed(struct libdecor_gtk4_frame_surface *frame_surface);
++
++extern const char *libdecor_gtk4_proxy_tag;
++
++static inline bool
++own_proxy(struct wl_proxy *proxy)
++{
++	return proxy && (wl_proxy_get_tag(proxy) ==
++			 &libdecor_gtk4_proxy_tag);
++}
++
++static inline bool
++own_output(struct wl_output *output)
++{
++	return own_proxy((struct wl_proxy *) output);
++}
++
++static inline bool
++own_surface(struct wl_surface *surface)
++{
++	return own_proxy((struct wl_proxy *) surface);
++}
++
++#endif /* LIBDECOR_GTK4_H */
+diff --git a/src/plugins/gtk4/libdecor-shell.xml b/src/plugins/gtk4/libdecor-shell.xml
+new file mode 100644
+index 0000000..27458a4
+--- /dev/null
++++ b/src/plugins/gtk4/libdecor-shell.xml
+@@ -0,0 +1,55 @@
++<protocol name="libdecor_gtk4">
++
++  <interface name="libdecor_shell" version="1">
++    <request name="ready"/>
++
++    <request name="sync">
++      <arg name="callback" type="new_id" interface="wl_callback"/>
++    </request>
++
++    <request name="create_frame">
++      <arg name="frame_surface" type="new_id"
++	   interface="libdecor_shell_surface"/>
++      <arg name="serial" type="uint"/>
++      <arg name="surface" type="object" interface="wl_surface"/>
++    </request>
++
++    <request name="titlebar_geometry">
++      <arg name="height" type="uint"/>
++    </request>
++
++    <event name="request_frame">
++      <arg name="serial" type="uint"/>
++    </event>
++
++    <event name="terminate"/>
++  </interface>
++
++  <interface name="libdecor_shell_surface" version="1">
++    <request name="destroy" type="destructor"/>
++    <request name="close"/>
++
++    <request name="set_content_area">
++      <arg name="x" type="int"/>
++      <arg name="y" type="int"/>
++      <arg name="width" type="int"/>
++      <arg name="height" type="int"/>
++      <arg name="window_geometry_x" type="int"/>
++      <arg name="window_geometry_y" type="int"/>
++      <arg name="surface_width" type="int"/>
++      <arg name="surface_height" type="int"/>
++    </request>
++
++    <event name="configure_content">
++      <arg name="width" type="int"/>
++      <arg name="height" type="int"/>
++    </event>
++
++    <event name="configure_title">
++      <arg name="title" type="string"/>
++    </event>
++
++    <event name="dismiss"/>
++  </interface>
++
++</protocol>
+diff --git a/src/plugins/gtk4/meson.build b/src/plugins/gtk4/meson.build
+new file mode 100644
+index 0000000..c66a9d5
+--- /dev/null
++++ b/src/plugins/gtk4/meson.build
+@@ -0,0 +1,242 @@
++wayland_server_dep = dependency('wayland-server', version: '>=1.20')
++
++wayland_protocols = [
++  {
++    'name': 'wayland',
++    'stability': 'core',
++    'no-wayland-scanner': true,
++    'filter': [
++      'wl_compositor',
++      'wl_display',
++      'wl_registry',
++      'wl_shell',
++      'wl_shell_surface',
++      'wl_subcompositor',
++      'wl_surface',
++    ],
++    'event-filters': [
++       ['wl_pointer', 'enter'],
++       ['wl_pointer', 'leave'],
++       ['wl_pointer', 'button'],
++       ['wl_seat', 'name'],
++    ]
++  },
++  {
++    'name': 'xdg-shell',
++    'stability': 'stable',
++    'no-tunnel': true,
++  },
++  {
++    'name': 'linux-dmabuf',
++    'stability': 'stable',
++    'version': '1',
++    'imports': ['wl_buffer'],
++  },
++  {
++    'name': 'tablet',
++    'stability': 'stable',
++    'version': '2',
++  },
++  {
++    'name': 'cursor-shape',
++    'stability': 'staging',
++    'version': '1',
++  },
++  {
++    'name': 'wayland-drm',
++    'stability': 'local',
++    'imports': ['wl_buffer'],
++  },
++  {
++    'name': 'libdecor-shell',
++    'stability': 'local',
++    'no-tunnel': true,
++  },
++]
++
++built_gtk4_sources = {}
++
++scanner = find_program('scanner.py')
++
++core_protocol_dir = wayland_server_dep.get_variable(pkgconfig: 'pkgdatadir')
++wayland_xml = core_protocol_dir / 'wayland.xml'
++
++tunnels = {}
++
++foreach p: wayland_protocols
++  stability = p['stability']
++  name = p['name']
++
++  assert(stability in ['core', 'stable', 'staging', 'unstable', 'local'],
++         'protocol \'@0@\' must be \'core\', \'stable\', \'staging\', \'unstable\' or \'local\''.format(name))
++
++  if stability == 'unstable'
++    suffix = '-unstable'
++  else
++    suffix = ''
++  endif
++  if p.has_key('version')
++    suffix += '-v@0@'.format(p['version'])
++  endif
++
++  output_base = name
++  if stability == 'local'
++    input = name+'.xml'
++  elif stability == 'core'
++    input = wayland_xml
++  else
++    input = join_paths(protocols_dir, stability, name, name+suffix+'.xml')
++  endif
++
++  client_header = custom_target('@0@ client header'.format(output_base),
++    input: input,
++    output: '@0@-client-protocol.h'.format(name + suffix),
++    command: [
++      wayland_scanner,
++      'client-header',
++      '@INPUT@', '@OUTPUT@',
++    ]
++  )
++  server_header = custom_target('@0@ server header'.format(output_base),
++    input: input,
++    output: '@0@-server-protocol.h'.format(name + suffix),
++    command: [
++      wayland_scanner,
++      'server-header',
++      '@INPUT@', '@OUTPUT@',
++    ]
++  )
++  protocol_source = custom_target('@0@ source'.format(output_base),
++    input: input,
++    output: '@0@-protocol.c'.format(name + suffix),
++    command: [
++      wayland_scanner,
++      'private-code',
++      '@INPUT@', '@OUTPUT@',
++    ]
++  )
++  if not p.has_key('no-wayland-scanner')
++    built_protocol_sources = [
++      client_header,
++      server_header,
++      protocol_source,
++    ]
++  else
++    built_protocol_sources = []
++  endif
++
++  if not p.has_key('no-tunnel')
++    depends = [server_header, client_header]
++    if p.has_key('imports')
++      extra_args = ['--import-from', wayland_xml]
++      foreach interface: p['imports']
++	extra_args += ['--import', interface]
++      endforeach
++      depends += tunnels['wayland']
++    else
++      extra_args = []
++    endif
++    if p.has_key('filter')
++      foreach filter: p['filter']
++	extra_args += ['--filter', filter]
++      endforeach
++    endif
++    if p.has_key('event-filters')
++      foreach event_filter: p['event-filters']
++	extra_args += [
++	  '--filter-event',
++	  '@0@.@1@'.format(event_filter[0], event_filter[1]),
++	]
++      endforeach
++    endif
++    tunnel_header = custom_target('@0@ tunnel header'.format(output_base),
++      input: input,
++      output: '@0@-tunnel.h'.format(name + suffix),
++      depend_files: scanner.full_path(),
++      capture: true,
++      command: [
++	scanner,
++	'--header',
++	'@INPUT@',
++      ],
++    )
++    tunnel_code = custom_target('@0@ tunnel code'.format(output_base),
++      input: input,
++      output: '@0@-tunnel.c'.format(name + suffix),
++      depends: depends,
++      depend_files: scanner.full_path(),
++      capture: true,
++      command: [
++	scanner,
++	'--code',
++	extra_args,
++	'@INPUT@',
++      ],
++    )
++    tunnels += { name: [tunnel_header, tunnel_code] }
++    built_protocol_sources += [
++      tunnel_header,
++      tunnel_code,
++    ]
++  endif
++  built_gtk4_sources += {name: built_protocol_sources}
++endforeach
++
++built_plugin_sources = [
++  built_gtk4_sources['wayland'],
++  built_gtk4_sources['linux-dmabuf'],
++  built_gtk4_sources['xdg-shell'],
++  built_gtk4_sources['wayland-drm'],
++  built_gtk4_sources['tablet'],
++  built_gtk4_sources['cursor-shape'],
++  built_gtk4_sources['libdecor-shell'],
++]
++
++shared_module('decor-gtk4',
++  sources: [
++    'libdecor-gtk4.c',
++    'libdecor-gtk4-tunnels.c',
++    built_plugin_sources,
++  ],
++  include_directories: [
++    top_includepath,
++    libdecor_includepath,
++    plugin_include_path,
++  ],
++  dependencies: [
++    libdecor_dep,
++    wayland_client_dep,
++    wayland_server_dep,
++    os_utils_dep,
++  ],
++  install_dir: join_paths(plugindir),
++  install: true,
++)
++
++built_client_sources = [
++  built_gtk4_sources['linux-dmabuf'][0],
++  built_gtk4_sources['linux-dmabuf'][2],
++  built_gtk4_sources['xdg-shell'][0],
++  built_gtk4_sources['xdg-shell'][2],
++  built_gtk4_sources['libdecor-shell'][0],
++  built_gtk4_sources['libdecor-shell'][2],
++]
++
++executable('libdecor-gtk4-client',
++  sources: [
++    'libdecor-gtk4-client.c',
++    built_client_sources,
++  ],
++  include_directories: [
++    top_includepath,
++    libdecor_includepath,
++    plugin_include_path,
++  ],
++  dependencies: [
++    gtk4_dep,
++    math_dep,
++    wayland_client_dep,
++  ],
++  install_dir: join_paths(plugindir),
++  install: true,
++)
+diff --git a/src/plugins/gtk4/scanner.py b/src/plugins/gtk4/scanner.py
+new file mode 100755
+index 0000000..732d2a9
+--- /dev/null
++++ b/src/plugins/gtk4/scanner.py
+@@ -0,0 +1,671 @@
++#!/usr/bin/env python3
++
++import os
++import sys
++import argparse
++import xml.etree.ElementTree as ET
++from dataclasses import dataclass, field
++from typing import List, Optional
++
++interface_map = {}
++event_filters = []
++nl = "\n"
++cnl = ",\n"
++
++
++@dataclass
++class Argument:
++    name: str
++    type: str
++    interface: Optional[str] = None
++
++    def get_ctype_server(self):
++        if self.type == "int":
++            return "int32_t"
++        elif self.type == "uint":
++            return "uint32_t"
++        elif self.type == "fixed":
++            return "wl_fixed_t"
++        elif self.type == "string":
++            return "const char *"
++        elif self.type == "fd":
++            return "int"
++        elif self.type == "object":
++            return "struct wl_resource *"
++        elif self.type == "array":
++            return "struct wl_array *"
++        elif self.type == "new_id":
++            return None
++
++    def get_ctype_client(self):
++        if self.type == "int":
++            return "int32_t"
++        elif self.type == "uint":
++            return "uint32_t"
++        elif self.type == "fixed":
++            return "wl_fixed_t"
++        elif self.type == "string":
++            return "const char *"
++        elif self.type == "fd":
++            return "int"
++        elif self.type == "object":
++            return f"struct {self.interface} *"
++        elif self.type == "array":
++            return "struct wl_array *"
++        elif self.type == "new_id":
++            return f"struct {self.interface} *"
++
++
++@dataclass
++class Request:
++    name: str
++    arguments: List[Argument] = field(default_factory=list)
++    is_destructor: bool = False
++    creates_interface: Optional[str] = None
++
++
++@dataclass
++class Event:
++    name: str
++    arguments: List[Argument] = field(default_factory=list)
++    is_destructor: bool = False
++    creates_interface: Optional[str] = None
++
++
++@dataclass
++class Interface:
++    name: str
++    version: int
++    requests: List[Request] = field(default_factory=list)
++    events: List[Event] = field(default_factory=list)
++    is_global: bool = False
++
++
++def parse_argument(arg_elem: ET.Element) -> Argument:
++    return Argument(
++        name=arg_elem.get("name", ""),
++        type=arg_elem.get("type", ""),
++        interface=arg_elem.get("interface"),
++    )
++
++
++def parse_request(req_elem: ET.Element) -> Request:
++    arguments = [parse_argument(arg) for arg in req_elem.findall("arg")]
++
++    creates_interface = None
++    for arg in arguments:
++        if arg.type == "new_id" and arg.interface:
++            creates_interface = arg.interface
++            break
++
++    return Request(
++        name=req_elem.get("name", ""),
++        arguments=arguments,
++        is_destructor=req_elem.get("type") == "destructor",
++        creates_interface=creates_interface,
++    )
++
++
++def parse_event(evt_elem: ET.Element) -> Event:
++    arguments = [parse_argument(arg) for arg in evt_elem.findall("arg")]
++
++    creates_interface = None
++    for arg in arguments:
++        if arg.type == "new_id" and arg.interface:
++            creates_interface = arg.interface
++            break
++
++    return Event(
++        name=evt_elem.get("name", ""),
++        arguments=arguments,
++        is_destructor=evt_elem.get("type") == "destructor",
++        creates_interface=creates_interface,
++    )
++
++
++def parse_interface(iface_elem: ET.Element) -> Interface:
++    requests = [parse_request(req) for req in iface_elem.findall("request")]
++    events = [parse_event(evt) for evt in iface_elem.findall("event")]
++
++    return Interface(
++        name=iface_elem.get("name", ""),
++        version=int(iface_elem.get("version", "1")),
++        requests=requests,
++        events=events,
++    )
++
++
++def parse_wayland_xml(
++    file_path: str,
++    filter_interfaces: Optional[set] = None,
++    only_interfaces: Optional[set] = None,
++) -> List[Interface]:
++    tree = ET.parse(file_path)
++    root = tree.getroot()
++
++    protocol_name = root.get("name")
++
++    if filter_interfaces is None:
++        filter_interfaces = set()
++
++    interfaces = []
++    for iface_elem in root.findall("interface"):
++        iface_name = iface_elem.get("name", "")
++        if only_interfaces:
++            if iface_name in only_interfaces:
++                interfaces.append(parse_interface(iface_elem))
++        else:
++            if iface_name not in filter_interfaces:
++                interfaces.append(parse_interface(iface_elem))
++
++    created_interfaces = set()
++    for interface in interfaces:
++        for request in interface.requests:
++            if request.creates_interface:
++                created_interfaces.add(request.creates_interface)
++        for event in interface.events:
++            if event.creates_interface:
++                created_interfaces.add(event.creates_interface)
++
++    for interface in interfaces:
++        interface.is_global = interface.name not in created_interfaces
++
++    return (protocol_name, interfaces)
++
++
++def generate_interface_declarations(interface):
++    if interface.requests:
++        print(
++            f"const struct {interface.name}_listener {interface.name}_implementation;"
++        )
++    if interface.events:
++        print(f"const struct {interface.name}_listener {interface.name}_listener;")
++    print("")
++
++
++def should_filter(interface, event):
++    return (interface.name, event.name) in event_filters
++
++
++def process_interface(interface):
++    parts = []
++    for request in interface.requests:
++        parts += [
++            f"""
++static void
++{interface.name}_process_{request.name}(
++"""
++        ]
++        passed_args = list(
++            filter(lambda arg: arg.get_ctype_server(), request.arguments)
++        )
++        proxy_args = [
++            """
++		tunnel_object->proxy"""
++        ]
++        for arg in passed_args:
++            if arg.type == "object":
++                proxy_args += [f"		{arg.name}_tunnel_object->proxy"]
++            else:
++                proxy_args += ["		" + arg.name]
++
++        function_args = [
++            "	struct wl_client *wl_client",
++            "	struct wl_resource *resource",
++        ]
++        if request.creates_interface:
++            function_args += ["	uint32_t id"]
++        for arg in passed_args:
++            function_args += [f"	{arg.get_ctype_server()} {arg.name}"]
++        parts += [",\n".join(function_args)]
++        parts += [
++            """)
++{
++	struct libdecor_gtk4_tunnel_object *tunnel_object =
++		wl_resource_get_user_data(resource);"""
++        ]
++
++        for arg in passed_args:
++            if arg.type == "object":
++                parts += [
++                    f"""
++	struct libdecor_gtk4_tunnel_object *{arg.name}_tunnel_object =
++		wl_resource_get_user_data({arg.name});"""
++                ]
++
++        if request.creates_interface:
++            new_interface = interface_map[request.creates_interface]
++            parts += [
++                f"""
++	struct libdecor_gtk4_tunnels *tunnels = tunnel_object->tunnels;
++	struct libdecor_gtk4_tunnel_object *new_tunnel_object;
++	struct {new_interface.name} *new_proxy;
++	struct wl_resource *new_resource;
++	int version = wl_resource_get_version(resource);
++
++	new_proxy = {interface.name}_{request.name}({cnl.join(proxy_args)});
++	wl_proxy_set_tag((struct wl_proxy *) new_proxy,
++			 &libdecor_gtk4_proxy_tag);
++	new_resource = wl_resource_create(wl_client,
++					  &{new_interface.name}_interface,
++					  version, id);
++	new_tunnel_object =
++		libdecor_gtk4_tunnel_object_new(tunnels, tunnel_object,
++						new_proxy, new_resource);
++"""
++            ]
++            if new_interface.requests:
++                parts += [
++                    f"""
++	wl_resource_set_implementation(new_resource,
++				       &{new_interface.name}_implementation,
++				       new_tunnel_object,
++				       destroy_{new_interface.name});
++"""
++                ]
++            else:
++                parts += [
++                    f"""
++	wl_resource_set_implementation(new_resource, NULL,
++				       new_tunnel_object, destroy_{new_interface.name});
++"""
++                ]
++            if new_interface.events:
++                parts += [
++                    f"""
++	{new_interface.name}_add_listener(new_proxy,
++		&{new_interface.name}_listener,
++		new_tunnel_object);{nl}"""
++                ]
++        else:
++            parts += [
++                f"{nl}{nl}	{interface.name}_{request.name}({cnl.join(proxy_args)});{nl}"
++            ]
++
++        if request.is_destructor:
++            parts += [f"{nl}	wl_resource_destroy(tunnel_object->resource);{nl}"]
++
++        for arg in passed_args:
++            if arg.type == "fd":
++                parts += [
++                    f"""
++	close({arg.name});
++"""
++                ]
++
++        parts += ["}\n"]
++
++    if interface.requests:
++        parts += [
++            f"""
++const struct {interface.name}_interface {interface.name}_implementation = {{
++    """
++        ]
++        request_handlers = []
++        for request in interface.requests:
++            request_handlers += [f"	{interface.name}_process_{request.name}"]
++        parts += [",\n".join(request_handlers)]
++        parts += ["\n};\n"]
++
++    for event in interface.events:
++        parts += [
++            f"""
++static void
++{interface.name}_handle_{event.name}(
++"""
++        ]
++        passed_args = list(filter(lambda arg: arg.get_ctype_client(), event.arguments))
++        proxy_args = [
++            """
++                tunnel_object->resource"""
++        ]
++        for arg in passed_args:
++            if arg.type == "object":
++                proxy_args += [
++                    f"		{arg.interface}_tunnel_object ? {arg.interface}_tunnel_object->resource : NULL"
++                ]
++            elif arg.type == "new_id":
++                proxy_args += [f"		new_tunnel_object->resource"]
++            else:
++                proxy_args += [f"		{arg.name}"]
++
++        function_args = [
++            "	void *data",
++            f"	struct {interface.name} *proxy",
++        ]
++        if event.creates_interface:
++            function_args += [f"	struct {event.creates_interface} *new_proxy"]
++        for arg in passed_args:
++            if arg.type == "object":
++                function_args += [f"	{arg.get_ctype_client()} {arg.name}"]
++            elif arg.type == "new_id":
++                pass
++            else:
++                function_args += [f"	{arg.get_ctype_client()} {arg.name}"]
++        parts += [",\n".join(function_args)]
++        parts += [
++            """)
++{
++	struct libdecor_gtk4_tunnel_object *tunnel_object = data;"""
++        ]
++
++        for arg in passed_args:
++            if arg.type == "object":
++                parts += [
++                    f"""
++	struct libdecor_gtk4_tunnel_object *{arg.interface}_tunnel_object =
++			{arg.name} ? {arg.interface}_get_user_data({arg.name}) : NULL;"""
++                ]
++
++        if event.creates_interface:
++            new_interface = interface_map[event.creates_interface]
++            parts += [
++                f"""
++	struct libdecor_gtk4_tunnels *tunnels = tunnel_object->tunnels;
++	struct wl_resource *new_resource;
++		struct libdecor_gtk4_tunnel_object *new_tunnel_object;
++
++	new_resource = wl_resource_create(wl_resource_get_client(tunnel_object->resource),
++					  &{new_interface.name}_interface,
++					  wl_resource_get_version(tunnel_object->resource),
++					  0);
++	wl_proxy_set_tag((struct wl_proxy *) new_proxy,
++			 &libdecor_gtk4_proxy_tag);
++	new_tunnel_object =
++		libdecor_gtk4_tunnel_object_new(tunnels,
++						tunnel_object,
++						new_proxy,
++ 						new_resource);
++"""
++            ]
++            if new_interface.requests:
++                parts += [
++                    f"""
++	wl_resource_set_implementation(new_resource,
++				       &{new_interface.name}_implementation,
++				       new_tunnel_object, destroy_{new_interface.name});
++"""
++                ]
++            if new_interface.events:
++                parts += [
++                    f"""
++	{new_interface.name}_add_listener(new_proxy,
++		&{new_interface.name}_listener,
++		new_tunnel_object);"""
++                ]
++
++        for surface_arg in filter(
++            lambda arg: arg.type == "object" and arg.interface == "wl_surface",
++            passed_args,
++        ):
++            parts += [
++                f"""
++
++	if (!own_surface({surface_arg.name}))
++		return;"""
++            ]
++
++        if should_filter(interface, event):
++            parts += [
++                f"""
++
++	if (tunnel_object->tunnels->{interface.name}_{event.name}_filter({cnl.join(proxy_args)}))
++		goto filtered;"""
++            ]
++
++        parts += [
++            f"""
++
++	{interface.name}_send_{event.name}({cnl.join(proxy_args)});
++"""
++        ]
++
++        if should_filter(interface, event):
++            parts += ["filtered:\n"]
++        if event.is_destructor:
++            parts += [
++                f"""
++	wl_proxy_destroy(tunnel_object->proxy);
++	wl_resource_destroy(tunnel_object->resource);
++"""
++            ]
++
++        for arg in passed_args:
++            if arg.type == "fd":
++                parts += [
++                    f"""
++	close({arg.name});
++"""
++                ]
++        parts += [
++            f"""}}
++"""
++        ]
++
++    if interface.events:
++        parts += [
++            f"""
++const struct {interface.name}_listener {interface.name}_listener = {{
++    """
++        ]
++        event_handlers = []
++        for event in interface.events:
++            event_handlers += [f"	{interface.name}_handle_{event.name}"]
++        parts += [",\n".join(event_handlers)]
++        parts += ["\n};\n"]
++
++    parts += [
++        f"""
++LIBDECOR_PRIVATE void
++destroy_{interface.name}(struct wl_resource *resource)
++{{
++	struct libdecor_gtk4_tunnel_object *tunnel_object =
++		wl_resource_get_user_data(resource);
++"""
++    ]
++
++    parts += [
++        """
++	libdecor_gtk4_tunnel_object_free(tunnel_object);
++}"""
++    ]
++
++    print("".join(parts))
++
++
++def process_global(interface):
++    global_binder_parts = [
++        f"""static void
++bind_{interface.name}(struct wl_client *client,
++		      void *data, uint32_t version, uint32_t id)
++{{
++	struct libdecor_gtk4_global *global = data;
++	struct libdecor_gtk4_tunnels *tunnels = global->tunnels;
++	struct {interface.name} *proxy;
++	struct wl_resource *resource;
++	struct libdecor_gtk4_tunnel_object *tunnel_object;
++
++	proxy = wl_registry_bind(global->tunnels->client.wl_registry,
++				 global->name,
++				 &{interface.name}_interface,
++				 version);
++	resource = wl_resource_create(client,
++				      &{interface.name}_interface,
++				      version, id);
++	tunnel_object =
++		libdecor_gtk4_tunnel_object_new(tunnels,
++						tunnels->root_tunnel_object,
++						proxy,
++						resource);
++"""
++    ]
++
++    if interface.events:
++        global_binder_parts += [
++            f"""
++	{interface.name}_add_listener(proxy,
++		&{interface.name}_listener,
++		tunnel_object);
++"""
++        ]
++
++    if interface.requests:
++        global_binder_parts += [
++            f"""
++	wl_resource_set_implementation(resource,
++				       &{interface.name}_implementation,
++				       tunnel_object,
++				       destroy_{interface.name});
++"""
++        ]
++    global_binder_parts += "}"
++
++    global_binder = "\n".join(global_binder_parts)
++
++    global_constructor = f"""
++{global_binder}
++
++struct libdecor_gtk4_global *
++{interface.name}_new(struct libdecor_gtk4_tunnels *tunnels,
++	uint32_t id,
++	uint32_t max_version)
++{{
++	struct libdecor_gtk4_global *global;
++	uint32_t tunneled_version;
++
++	global = zalloc(sizeof *global);
++	tunneled_version = MIN(max_version, {interface.version});
++	global->tunnels = tunnels;
++	global->name = id;
++	global->wl_global = wl_global_create(tunnels->server.wl_display,
++	    &{interface.name}_interface,
++	    tunneled_version,
++	    global, bind_{interface.name});
++
++	wl_list_insert(&tunnels->globals, &global->link);
++
++	return global;
++}}"""
++    print(global_constructor)
++
++
++def process_global_declaration(interface):
++    global_declaration = f"""struct libdecor_gtk4_global *
++{interface.name}_new(struct libdecor_gtk4_tunnels *tunnels,
++	uint32_t id,
++	uint32_t max_version);
++"""
++    print(global_declaration)
++
++
++def main():
++    """Main function to parse and display Wayland protocol information."""
++    parser = argparse.ArgumentParser(
++        description="Parse Wayland protocol XML files and extract interfaces, requests, and events."
++    )
++    parser.add_argument("xml_file", help="Path to the Wayland XML protocol file")
++    parser.add_argument(
++        "-f",
++        "--filter",
++        action="append",
++        dest="filters",
++        metavar="INTERFACE",
++        help="Filter out an interface by name. Can be specified multiple times.",
++    )
++    parser.add_argument(
++        "--import-from", metavar="PATH", help="Path to the XMl file to import from."
++    )
++    parser.add_argument(
++        "--import",
++        action="append",
++        dest="imports",
++        metavar="INTERFACE",
++        help="Import intarface core interface boiler plate. Can be specified multiple times.",
++    )
++    parser.add_argument("--code", action="store_true", help="Generated C code.")
++    parser.add_argument("--header", action="store_true", help="Generated C header.")
++    parser.add_argument(
++        "--filter-event",
++        action="append",
++        default=[],
++        dest="event_filters",
++        metavar="INTERFACE.EVENT",
++        help="Pass these events through a filter.",
++    )
++
++    args = parser.parse_args()
++
++    filter_set = set(args.filters) if args.filters else set()
++    try:
++        if args.imports:
++            imported_protocol_name, imported_interfaces = parse_wayland_xml(
++                args.import_from, None, set(args.imports)
++            )
++        else:
++            imported_interfaces = []
++        protocol_name, interfaces = parse_wayland_xml(args.xml_file, None, None)
++    except FileNotFoundError:
++        print(f"Error: File '{args.xml_file}' not found", file=sys.stderr)
++        sys.exit(1)
++    except ET.ParseError as e:
++        print(f"Error parsing XML: {e}", file=sys.stderr)
++        sys.exit(1)
++
++    for event_filter in args.event_filters:
++        global event_filters
++        interface, event = event_filter.split(".")
++        event_filters += [(interface, event)]
++
++    if args.code:
++        include_basename = os.path.basename(args.xml_file).removesuffix(".xml")
++        for interface in interfaces:
++            interface_map[interface.name] = interface
++        for interface in imported_interfaces:
++            interface_map[interface.name] = interface
++
++        print("#include <stdlib.h>")
++        print("#include <unistd.h>")
++        print("")
++        print('#include "libdecor-gtk4.h"')
++        print("")
++        if protocol_name == "wayland":
++            print("#include <wayland-client-core.h>")
++            print("#include <wayland-server-core.h>")
++        else:
++            print("#include <wayland-client.h>")
++            print("#include <wayland-server.h>")
++        print("")
++        print(f'#include "{include_basename}-client-protocol.h"')
++        print(f'#include "{include_basename}-server-protocol.h"')
++        if args.imports:
++            print('#include "wayland-tunnel.h"')
++        print(f'#include "{include_basename}-tunnel.h"')
++        print("")
++
++        for interface in interfaces:
++            if interface.name not in filter_set:
++                process_interface(interface)
++
++        for interface in interfaces:
++            if interface.name not in filter_set:
++                if interface.is_global:
++                    process_global(interface)
++    elif args.header:
++        print("#pragma once")
++        print("")
++        print("#include <wayland-server-core.h>")
++        for interface in interfaces:
++            if interface.name not in filter_set:
++                print(
++                    f"""
++extern const struct {interface.name}_interface {interface.name}_implementation;
++void destroy_{interface.name}(struct wl_resource *resource);
++extern const struct {interface.name}_listener {interface.name}_listener;
++    """
++                )
++                if interface.is_global:
++                    process_global_declaration(interface)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/src/plugins/gtk4/wayland-drm.xml b/src/plugins/gtk4/wayland-drm.xml
+new file mode 100644
+index 0000000..eaf2654
+--- /dev/null
++++ b/src/plugins/gtk4/wayland-drm.xml
+@@ -0,0 +1,189 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<protocol name="drm">
++
++  <copyright>
++    Copyright © 2008-2011 Kristian Høgsberg
++    Copyright © 2010-2011 Intel Corporation
++
++    Permission to use, copy, modify, distribute, and sell this
++    software and its documentation for any purpose is hereby granted
++    without fee, provided that\n the above copyright notice appear in
++    all copies and that both that copyright notice and this permission
++    notice appear in supporting documentation, and that the name of
++    the copyright holders not be used in advertising or publicity
++    pertaining to distribution of the software without specific,
++    written prior permission.  The copyright holders make no
++    representations about the suitability of this software for any
++    purpose.  It is provided "as is" without express or implied
++    warranty.
++
++    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
++    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
++    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
++    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
++    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
++    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
++    THIS SOFTWARE.
++  </copyright>
++
++  <!-- drm support. This object is created by the server and published
++       using the display's global event. -->
++  <interface name="wl_drm" version="2">
++    <enum name="error">
++      <entry name="authenticate_fail" value="0"/>
++      <entry name="invalid_format" value="1"/>
++      <entry name="invalid_name" value="2"/>
++    </enum>
++
++    <enum name="format">
++      <!-- The drm format codes match the #defines in drm_fourcc.h.
++           The formats actually supported by the compositor will be
++           reported by the format event. New codes must not be added,
++           unless directly taken from drm_fourcc.h. -->
++      <entry name="c8" value="0x20203843"/>
++      <entry name="rgb332" value="0x38424752"/>
++      <entry name="bgr233" value="0x38524742"/>
++      <entry name="xrgb4444" value="0x32315258"/>
++      <entry name="xbgr4444" value="0x32314258"/>
++      <entry name="rgbx4444" value="0x32315852"/>
++      <entry name="bgrx4444" value="0x32315842"/>
++      <entry name="argb4444" value="0x32315241"/>
++      <entry name="abgr4444" value="0x32314241"/>
++      <entry name="rgba4444" value="0x32314152"/>
++      <entry name="bgra4444" value="0x32314142"/>
++      <entry name="xrgb1555" value="0x35315258"/>
++      <entry name="xbgr1555" value="0x35314258"/>
++      <entry name="rgbx5551" value="0x35315852"/>
++      <entry name="bgrx5551" value="0x35315842"/>
++      <entry name="argb1555" value="0x35315241"/>
++      <entry name="abgr1555" value="0x35314241"/>
++      <entry name="rgba5551" value="0x35314152"/>
++      <entry name="bgra5551" value="0x35314142"/>
++      <entry name="rgb565" value="0x36314752"/>
++      <entry name="bgr565" value="0x36314742"/>
++      <entry name="rgb888" value="0x34324752"/>
++      <entry name="bgr888" value="0x34324742"/>
++      <entry name="xrgb8888" value="0x34325258"/>
++      <entry name="xbgr8888" value="0x34324258"/>
++      <entry name="rgbx8888" value="0x34325852"/>
++      <entry name="bgrx8888" value="0x34325842"/>
++      <entry name="argb8888" value="0x34325241"/>
++      <entry name="abgr8888" value="0x34324241"/>
++      <entry name="rgba8888" value="0x34324152"/>
++      <entry name="bgra8888" value="0x34324142"/>
++      <entry name="xrgb2101010" value="0x30335258"/>
++      <entry name="xbgr2101010" value="0x30334258"/>
++      <entry name="rgbx1010102" value="0x30335852"/>
++      <entry name="bgrx1010102" value="0x30335842"/>
++      <entry name="argb2101010" value="0x30335241"/>
++      <entry name="abgr2101010" value="0x30334241"/>
++      <entry name="rgba1010102" value="0x30334152"/>
++      <entry name="bgra1010102" value="0x30334142"/>
++      <entry name="yuyv" value="0x56595559"/>
++      <entry name="yvyu" value="0x55595659"/>
++      <entry name="uyvy" value="0x59565955"/>
++      <entry name="vyuy" value="0x59555956"/>
++      <entry name="ayuv" value="0x56555941"/>
++      <entry name="xyuv8888" value="0x56555958"/>
++      <entry name="nv12" value="0x3231564e"/>
++      <entry name="nv21" value="0x3132564e"/>
++      <entry name="nv16" value="0x3631564e"/>
++      <entry name="nv61" value="0x3136564e"/>
++      <entry name="yuv410" value="0x39565559"/>
++      <entry name="yvu410" value="0x39555659"/>
++      <entry name="yuv411" value="0x31315559"/>
++      <entry name="yvu411" value="0x31315659"/>
++      <entry name="yuv420" value="0x32315559"/>
++      <entry name="yvu420" value="0x32315659"/>
++      <entry name="yuv422" value="0x36315559"/>
++      <entry name="yvu422" value="0x36315659"/>
++      <entry name="yuv444" value="0x34325559"/>
++      <entry name="yvu444" value="0x34325659"/>
++      <entry name="abgr16f" value="0x48344241"/>
++      <entry name="xbgr16f" value="0x48344258"/>
++    </enum>
++
++    <!-- Call this request with the magic received from drmGetMagic().
++         It will be passed on to the drmAuthMagic() or
++         DRIAuthConnection() call.  This authentication must be
++         completed before create_buffer could be used. -->
++    <request name="authenticate">
++      <arg name="id" type="uint"/>
++    </request>
++
++    <!-- Create a wayland buffer for the named DRM buffer.  The DRM
++         surface must have a name using the flink ioctl -->
++    <request name="create_buffer">
++      <arg name="id" type="new_id" interface="wl_buffer"/>
++      <arg name="name" type="uint"/>
++      <arg name="width" type="int"/>
++      <arg name="height" type="int"/>
++      <arg name="stride" type="uint"/>
++      <arg name="format" type="uint"/>
++    </request>
++
++    <!-- Create a wayland buffer for the named DRM buffer.  The DRM
++         surface must have a name using the flink ioctl -->
++    <request name="create_planar_buffer">
++      <arg name="id" type="new_id" interface="wl_buffer"/>
++      <arg name="name" type="uint"/>
++      <arg name="width" type="int"/>
++      <arg name="height" type="int"/>
++      <arg name="format" type="uint"/>
++      <arg name="offset0" type="int"/>
++      <arg name="stride0" type="int"/>
++      <arg name="offset1" type="int"/>
++      <arg name="stride1" type="int"/>
++      <arg name="offset2" type="int"/>
++      <arg name="stride2" type="int"/>
++    </request>
++
++    <!-- Notification of the path of the drm device which is used by
++         the server.  The client should use this device for creating
++         local buffers.  Only buffers created from this device should
++         be be passed to the server using this drm object's
++         create_buffer request. -->
++    <event name="device">
++      <arg name="name" type="string"/>
++    </event>
++
++    <event name="format">
++      <arg name="format" type="uint"/>
++    </event>
++
++    <!-- Raised if the authenticate request succeeded -->
++    <event name="authenticated"/>
++
++    <enum name="capability" since="2">
++      <description summary="wl_drm capability bitmask">
++        Bitmask of capabilities.
++      </description>
++      <entry name="prime" value="1" summary="wl_drm prime available"/>
++    </enum>
++
++    <event name="capabilities">
++      <arg name="value" type="uint"/>
++    </event>
++
++    <!-- Version 2 additions -->
++
++    <!-- Create a wayland buffer for the prime fd.  Use for regular and planar
++         buffers.  Pass 0 for offset and stride for unused planes. -->
++    <request name="create_prime_buffer" since="2">
++      <arg name="id" type="new_id" interface="wl_buffer"/>
++      <arg name="name" type="fd"/>
++      <arg name="width" type="int"/>
++      <arg name="height" type="int"/>
++      <arg name="format" type="uint"/>
++      <arg name="offset0" type="int"/>
++      <arg name="stride0" type="int"/>
++      <arg name="offset1" type="int"/>
++      <arg name="stride1" type="int"/>
++      <arg name="offset2" type="int"/>
++      <arg name="stride2" type="int"/>
++    </request>
++
++  </interface>
++
++</protocol>
+diff --git a/src/plugins/meson.build b/src/plugins/meson.build
+index 08bcd7c..e300b29 100644
+--- a/src/plugins/meson.build
++++ b/src/plugins/meson.build
+@@ -1,4 +1,5 @@
+ gtk_dep = dependency('gtk+-3.0', required: get_option('gtk'))
++gtk4_dep = dependency('gtk4', required: get_option('gtk4'))
+ 
+ plugin_include_path = include_directories('.')
+ 
+@@ -9,3 +10,7 @@ subdir('dummy')
+ if gtk_dep.found()
+   subdir('gtk')
+ endif
++
++if gtk4_dep.found()
++  subdir('gtk4')
++endif
+diff --git a/src/utils.h b/src/utils.h
+index 102a9ff..da48211 100644
+--- a/src/utils.h
++++ b/src/utils.h
+@@ -57,4 +57,14 @@ libdecor_strcmp0 (const char *str1,
+   return strcmp(str1, str2);
+ }
+ 
++#ifndef __has_attribute
++#define __has_attribute(x) 0  /* Compatibility with non-clang compilers. */
++#endif
++
++#if (__has_attribute(visibility) || defined(__GNUC__) && __GNUC__ >= 4)
++#define LIBDECOR_PRIVATE __attribute__ ((visibility("hidden")))
++#else
++#define LIBDECOR_PRIVATE
++#endif
++
+ #endif /* UTILS_H */
+-- 
+GitLab
+
+
+From 615e2d9a436aea48d42f4a753aeb05b23d9ab7c5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 30 Mar 2026 15:19:09 +0200
+Subject: [PATCH 14/20] Call notify_property_changed() on wm capability changes
+
+---
+ src/libdecor.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/libdecor.c b/src/libdecor.c
+index 3ee1c45..2c3b04f 100644
+--- a/src/libdecor.c
++++ b/src/libdecor.c
+@@ -546,8 +546,12 @@ xdg_toplevel_wm_capabilities(void *user_data,
+ {
+ 	struct libdecor_frame *frame = user_data;
+ 	struct libdecor_frame_private *frame_priv = frame->priv;
++	struct libdecor *context = frame_priv->context;
++	struct libdecor_plugin *plugin = context->plugin;
+ 	enum xdg_toplevel_wm_capabilities *wm_cap;
++	enum libdecor_wm_capabilities old_wm_capabilities;
+ 
++	old_wm_capabilities = frame_priv->wm_capabilities;
+ 	frame_priv->wm_capabilities = 0;
+ 
+ 	wl_array_for_each(wm_cap, capabilities) {
+@@ -568,6 +572,9 @@ xdg_toplevel_wm_capabilities(void *user_data,
+ 			break;
+ 		}
+ 	}
++
++	if (old_wm_capabilities != frame_priv->wm_capabilities)
++		plugin->priv->iface->frame_property_changed(plugin, frame);
+ }
+ #endif
+ 
+-- 
+GitLab
+
+
+From 3271c3c80d8e1467d39df4c03c0ed98e68229c20 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 30 Mar 2026 15:19:41 +0200
+Subject: [PATCH 15/20] Still call notify_property_changed() even when content
+ is empty
+
+This allows changed properties to be communicated to the plugin earlier.
+---
+ src/libdecor.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/libdecor.c b/src/libdecor.c
+index 2c3b04f..df63c7b 100644
+--- a/src/libdecor.c
++++ b/src/libdecor.c
+@@ -893,10 +893,6 @@ notify_on_capability_change(struct libdecor_frame *frame,
+ 	if (frame->priv->capabilities == old_capabilities)
+ 		return;
+ 
+-	if (frame->priv->content_width == 0 ||
+-	    frame->priv->content_height == 0)
+-		return;
+-
+ 	plugin->priv->iface->frame_property_changed(plugin, frame);
+ 
+ 	if (!libdecor_frame_has_capability(frame, LIBDECOR_ACTION_RESIZE)) {
+@@ -913,6 +909,10 @@ notify_on_capability_change(struct libdecor_frame *frame,
+ 		frame->priv->state.content_limits = frame->priv->interactive_limits;
+ 	}
+ 
++	if (frame->priv->content_width == 0 ||
++	    frame->priv->content_height == 0)
++		return;
++
+ 	state = libdecor_state_new(frame->priv->content_width,
+ 				   frame->priv->content_height);
+ 	libdecor_frame_commit(frame, state, NULL);
+-- 
+GitLab
+
+
+From 965b8b3101fe11c9e744ad923cb74a8f69f4ee40 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 30 Mar 2026 15:23:29 +0200
+Subject: [PATCH 16/20] gtk4: Make window background transparent
+
+This allows decorated content with transparent background to maintain
+their transparency.
+---
+ src/plugins/gtk4/libdecor-gtk4-client.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/plugins/gtk4/libdecor-gtk4-client.c b/src/plugins/gtk4/libdecor-gtk4-client.c
+index 200419f..ab8dbef 100644
+--- a/src/plugins/gtk4/libdecor-gtk4-client.c
++++ b/src/plugins/gtk4/libdecor-gtk4-client.c
+@@ -368,6 +368,7 @@ main(int argc, char **argv)
+ {
+ 	GMainLoop *loop;
+ 	const char *wayland_debug;
++	GtkCssProvider *provider;
+ 
+ 	unsetenv("WAYLAND_DISPLAY");
+ 	unsetenv("DISPLAY");
+@@ -389,6 +390,16 @@ main(int argc, char **argv)
+ 		return EXIT_FAILURE;
+ 	}
+ 
++	provider = gtk_css_provider_new();
++	gtk_css_provider_load_from_string(provider,
++					  "window.background {\n"
++					  "  background: rgba(0,0,0,0);\n"
++					  "}\n");
++	gtk_style_context_add_provider_for_display(gdk_display_get_default (),
++						   GTK_STYLE_PROVIDER (provider),
++						   GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
++	g_object_unref(provider);
++
+ 	update_header_bar_geometry ();
+ 
+ 	libdecor_shell_ready(libdecor_shell);
+-- 
+GitLab
+
+
+From cbc92987c4886db0a4c8d74ebe30918c394df811 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 30 Mar 2026 15:24:30 +0200
+Subject: [PATCH 17/20] gtk4: Send xdg_toplevel.wm_capabilities
+
+This bumps the version to 5, and plumbs the window manager capabilities
+to the GTK4 client so that it can correctly mark the corresponding
+window action widgets active/inactive.
+---
+ src/plugins/gtk4/libdecor-gtk4.c | 60 +++++++++++++++++++++++++++++++-
+ 1 file changed, 59 insertions(+), 1 deletion(-)
+
+diff --git a/src/plugins/gtk4/libdecor-gtk4.c b/src/plugins/gtk4/libdecor-gtk4.c
+index 99671e5..c892534 100644
+--- a/src/plugins/gtk4/libdecor-gtk4.c
++++ b/src/plugins/gtk4/libdecor-gtk4.c
+@@ -50,7 +50,7 @@
+ #include "xdg-shell-server-protocol.h"
+ #include "libdecor-shell-server-protocol.h"
+ 
+-#define XDG_WM_BASE_VERSION 3
++#define XDG_WM_BASE_VERSION 5
+ #define LIBDECOR_SHELL_VERSION 1
+ 
+ struct dispatch_state {
+@@ -78,6 +78,7 @@ struct libdecor_frame_gtk4 {
+ 	struct wl_list link;
+ 
+ 	char *title;
++	enum libdecor_wm_capabilities wm_capabilities;
+ };
+ 
+ struct libdecor_plugin_gtk4 {
+@@ -717,6 +718,52 @@ libdecor_plugin_gtk4_frame_commit(struct libdecor_plugin *plugin,
+ 	frame_surface->in_commit = false;
+ }
+ 
++static void
++add_wm_capabilities(struct wl_array *xdg_wm_capabilities,
++		    enum libdecor_wm_capabilities wm_capabilities)
++{
++	if (wm_capabilities & LIBDECOR_WM_CAPABILITIES_WINDOW_MENU) {
++		add_uint32_to_array(xdg_wm_capabilities,
++				    XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU);
++	}
++	if (wm_capabilities & LIBDECOR_WM_CAPABILITIES_MAXIMIZE) {
++		add_uint32_to_array(xdg_wm_capabilities,
++				    XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE);
++	}
++	if (wm_capabilities & LIBDECOR_WM_CAPABILITIES_FULLSCREEN) {
++		add_uint32_to_array(xdg_wm_capabilities,
++				    XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
++	}
++	if (wm_capabilities & LIBDECOR_WM_CAPABILITIES_MINIMIZE) {
++		add_uint32_to_array(xdg_wm_capabilities,
++				    XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
++	}
++}
++
++static void
++send_wm_capabilities(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4;
++	struct wl_resource *toplevel_resource;
++	struct wl_array xdg_wm_capabilities;
++
++	toplevel_resource = frame_surface->server.xdg_toplevel_resource;
++	if (wl_resource_get_version(toplevel_resource) <
++	    XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION)
++		return;
++
++	frame_gtk4 = frame_surface->frame_gtk4;
++	if (!frame_gtk4)
++		return;
++
++	wl_array_init(&xdg_wm_capabilities);
++	add_wm_capabilities(&xdg_wm_capabilities,
++			    frame_gtk4->wm_capabilities);
++	xdg_toplevel_send_wm_capabilities(toplevel_resource,
++					  &xdg_wm_capabilities);
++	wl_array_release(&xdg_wm_capabilities);
++}
++
+ static void
+ libdecor_plugin_gtk4_frame_property_changed(struct libdecor_plugin *plugin,
+ 					    struct libdecor_frame *frame)
+@@ -733,6 +780,13 @@ libdecor_plugin_gtk4_frame_property_changed(struct libdecor_plugin *plugin,
+ 		set_string(&frame_gtk4->title, title);
+ 		libdecor_shell_surface_send_configure_title(shell_surface, title);
+ 	}
++
++	if (libdecor_frame_get_wm_capabilities(frame) !=
++	    frame_gtk4->wm_capabilities) {
++		frame_gtk4->wm_capabilities =
++			libdecor_frame_get_wm_capabilities(frame);
++		send_wm_capabilities(frame_surface);
++	}
+ }
+ 
+ static struct libdecor_gtk4_seat *
+@@ -1109,6 +1163,8 @@ xdg_surface_handle_get_toplevel(struct wl_client *wl_client,
+ 				       &xdg_toplevel_implementation,
+ 				       libdecor_gtk4_frame_surface_ref (frame_surface),
+ 				       destroy_xdg_toplevel);
++
++	send_wm_capabilities(frame_surface);
+ }
+ 
+ static void
+@@ -1430,6 +1486,8 @@ libdecor_shell_handle_create_frame(struct wl_client *wl_client,
+ 				       &libdecor_shell_surface_implementation,
+ 				       libdecor_gtk4_frame_surface_ref (frame_surface),
+ 				       destroy_frame_surface);
++
++	send_wm_capabilities(frame_surface);
+ }
+ 
+ static void
+-- 
+GitLab
+
+
+From 7f988290c33da761b378592962014fa5d76ae6fd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 30 Mar 2026 15:25:51 +0200
+Subject: [PATCH 18/20] gtk4: Reflect content resizability in the GTK client
+
+This means non-resizable windows wont get the resize pointer cursors
+while hovering the edges.
+---
+ src/plugins/gtk4/libdecor-gtk4-client.c | 12 ++++++++++++
+ src/plugins/gtk4/libdecor-gtk4.c        | 22 ++++++++++++++++++++++
+ src/plugins/gtk4/libdecor-shell.xml     |  4 ++++
+ 3 files changed, 38 insertions(+)
+
+diff --git a/src/plugins/gtk4/libdecor-gtk4-client.c b/src/plugins/gtk4/libdecor-gtk4-client.c
+index ab8dbef..fd99a0b 100644
+--- a/src/plugins/gtk4/libdecor-gtk4-client.c
++++ b/src/plugins/gtk4/libdecor-gtk4-client.c
+@@ -241,6 +241,17 @@ libdecor_shell_surface_handle_configure_title(void *data,
+ 	gtk_window_set_title(GTK_WINDOW(frame_window->window), title);
+ }
+ 
++static void
++libdecor_shell_surface_handle_configure_resizable(void *data,
++						  struct libdecor_shell_surface *libdecor_shell_surface,
++						  int32_t is_resizable)
++{
++	struct frame_window *frame_window = data;
++
++	gtk_window_set_resizable(GTK_WINDOW(frame_window->window),
++				 is_resizable);
++}
++
+ static void
+ libdecor_shell_surface_handle_dismiss(void *data,
+ 				      struct libdecor_shell_surface *libdecor_shell_surface)
+@@ -253,6 +264,7 @@ libdecor_shell_surface_handle_dismiss(void *data,
+ static struct libdecor_shell_surface_listener libdecor_shell_surface_listener = {
+ 	.configure_content = libdecor_shell_surface_handle_configure_content,
+ 	.configure_title = libdecor_shell_surface_handle_configure_title,
++	.configure_resizable = libdecor_shell_surface_handle_configure_resizable,
+ 	.dismiss = libdecor_shell_surface_handle_dismiss,
+ };
+ 
+diff --git a/src/plugins/gtk4/libdecor-gtk4.c b/src/plugins/gtk4/libdecor-gtk4.c
+index c892534..1f00d38 100644
+--- a/src/plugins/gtk4/libdecor-gtk4.c
++++ b/src/plugins/gtk4/libdecor-gtk4.c
+@@ -79,6 +79,7 @@ struct libdecor_frame_gtk4 {
+ 
+ 	char *title;
+ 	enum libdecor_wm_capabilities wm_capabilities;
++	enum libdecor_capabilities capabilities;
+ };
+ 
+ struct libdecor_plugin_gtk4 {
+@@ -764,6 +765,20 @@ send_wm_capabilities(struct libdecor_gtk4_frame_surface *frame_surface)
+ 	wl_array_release(&xdg_wm_capabilities);
+ }
+ 
++static void
++send_capabilities(struct libdecor_gtk4_frame_surface *frame_surface)
++{
++	struct libdecor_frame_gtk4 *frame_gtk4 = frame_surface->frame_gtk4;
++	struct wl_resource *shell_surface =
++		frame_surface->server.shell_surface_resource;
++	int32_t is_resizable;
++
++	is_resizable = libdecor_frame_has_capability(&frame_gtk4->frame,
++						     LIBDECOR_ACTION_RESIZE);
++	libdecor_shell_surface_send_configure_resizable(shell_surface,
++							is_resizable);
++}
++
+ static void
+ libdecor_plugin_gtk4_frame_property_changed(struct libdecor_plugin *plugin,
+ 					    struct libdecor_frame *frame)
+@@ -787,6 +802,13 @@ libdecor_plugin_gtk4_frame_property_changed(struct libdecor_plugin *plugin,
+ 			libdecor_frame_get_wm_capabilities(frame);
+ 		send_wm_capabilities(frame_surface);
+ 	}
++
++	if (libdecor_frame_get_capabilities(frame) !=
++	    frame_gtk4->capabilities) {
++		frame_gtk4->capabilities =
++			libdecor_frame_get_capabilities(frame);
++		send_capabilities(frame_surface);
++	}
+ }
+ 
+ static struct libdecor_gtk4_seat *
+diff --git a/src/plugins/gtk4/libdecor-shell.xml b/src/plugins/gtk4/libdecor-shell.xml
+index 27458a4..0cdb29a 100644
+--- a/src/plugins/gtk4/libdecor-shell.xml
++++ b/src/plugins/gtk4/libdecor-shell.xml
+@@ -45,6 +45,10 @@
+       <arg name="height" type="int"/>
+     </event>
+ 
++    <event name="configure_resizable">
++      <arg name="resizable" type="int"/>
++    </event>
++
+     <event name="configure_title">
+       <arg name="title" type="string"/>
+     </event>
+-- 
+GitLab
+
+
+From 216c1d9486edf8537fc0871b9c2b04a97edbafa8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 30 Mar 2026 16:19:17 +0200
+Subject: [PATCH 19/20] gtk4: Allow specifying client executable
+
+This is useful when building libdecor as a 32 bit library on a 64 bit
+system, so one can compile the necassary client side dependencies only
+for the 64 bit architecture.
+---
+ config.h.meson                   |  3 +++
+ meson.build                      | 11 ++++++++-
+ meson_options.txt                |  5 ++++
+ src/plugins/gtk4/libdecor-gtk4.c |  5 ++++
+ src/plugins/gtk4/meson.build     | 39 +++++++++++++++++---------------
+ src/plugins/meson.build          |  9 ++++++--
+ 6 files changed, 51 insertions(+), 21 deletions(-)
+
+diff --git a/config.h.meson b/config.h.meson
+index d64f7ad..83ad78f 100644
+--- a/config.h.meson
++++ b/config.h.meson
+@@ -7,6 +7,9 @@
+ /* Plugin API version */
+ #mesondefine LIBDECOR_PLUGIN_API_VERSION
+ 
++/* Path to GTK4 client executable */
++#mesondefine LIBDECOR_PLUGIN_GTK4_CLIENT_PATH
++
+ #mesondefine HAS_DBUS
+ 
+ #mesondefine HAVE_MKOSTEMP
+diff --git a/meson.build b/meson.build
+index 1e92328..608501d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1,6 +1,6 @@
+ project('libdecor', 'c',
+   version: '0.2.2',
+-  meson_version: '>= 0.55.0',
++  meson_version: '>= 1.1.0',
+   license: 'MIT',
+   default_options: [
+     'c_std=c99',
+@@ -74,6 +74,15 @@ cdata.set('LIBDECOR_PLUGIN_API_VERSION', plugin_api_version)
+ if dbus_dep.found()
+   cdata.set('HAS_DBUS', true)
+ endif
++if get_option('gtk4').enabled()
++  libdecor_gtk4_client_name = 'libdecor-gtk4-client'
++  if get_option('gtk4_client') == ''
++    libdecor_gtk4_client_path = plugindir / libdecor_gtk4_client_name
++  else
++    libdecor_gtk4_client_path = get_option('gtk4_client')
++  endif
++  cdata.set_quoted('LIBDECOR_PLUGIN_GTK4_CLIENT_PATH', libdecor_gtk4_client_path)
++endif
+ 
+ if cc.has_function('mkostemp', prefix: '#include <stdlib.h>')
+   cdata.set('HAVE_MKOSTEMP', true)
+diff --git a/meson_options.txt b/meson_options.txt
+index 90395be..57f0239 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -7,3 +7,8 @@ option('install_demo', type: 'boolean', value: false, description: 'install demo
+ option('gtk', type: 'feature', value: 'enabled', description: 'build GTK plugin')
+ 
+ option('gtk4', type: 'feature', value: 'enabled', description: 'build GTK4 plugin')
++
++option('gtk4_client', type: 'string', value: '',
++  description: 'Path to gtk4 external plugin client. The client must of the ' +
++               'exact same version as the plugin itself, but can have ' +
++	       'another architecture.')
+diff --git a/src/plugins/gtk4/libdecor-gtk4.c b/src/plugins/gtk4/libdecor-gtk4.c
+index 1f00d38..a034291 100644
+--- a/src/plugins/gtk4/libdecor-gtk4.c
++++ b/src/plugins/gtk4/libdecor-gtk4.c
+@@ -1581,6 +1581,11 @@ find_client_path(void)
+ 
+ 	plugin_dir_env = getenv("LIBDECOR_PLUGIN_DIR");
+ 	if (!plugin_dir_env) {
++		if (access(LIBDECOR_PLUGIN_GTK4_CLIENT_PATH, R_OK | X_OK) == 0) {
++			client_path = strdup(LIBDECOR_PLUGIN_GTK4_CLIENT_PATH);
++			goto out;
++		}
++	} else {
+ 		plugin_dir_env = LIBDECOR_PLUGIN_DIR;
+ 	}
+ 
+diff --git a/src/plugins/gtk4/meson.build b/src/plugins/gtk4/meson.build
+index c66a9d5..31c77cb 100644
+--- a/src/plugins/gtk4/meson.build
++++ b/src/plugins/gtk4/meson.build
+@@ -222,21 +222,24 @@ built_client_sources = [
+   built_gtk4_sources['libdecor-shell'][2],
+ ]
+ 
+-executable('libdecor-gtk4-client',
+-  sources: [
+-    'libdecor-gtk4-client.c',
+-    built_client_sources,
+-  ],
+-  include_directories: [
+-    top_includepath,
+-    libdecor_includepath,
+-    plugin_include_path,
+-  ],
+-  dependencies: [
+-    gtk4_dep,
+-    math_dep,
+-    wayland_client_dep,
+-  ],
+-  install_dir: join_paths(plugindir),
+-  install: true,
+-)
++client = get_option('gtk4_client')
++if client == ''
++  executable(libdecor_gtk4_client_name,
++    sources: [
++      'libdecor-gtk4-client.c',
++      built_client_sources,
++    ],
++    include_directories: [
++      top_includepath,
++      libdecor_includepath,
++      plugin_include_path,
++    ],
++    dependencies: [
++      gtk4_dep,
++      math_dep,
++      wayland_client_dep,
++    ],
++    install_dir: join_paths(plugindir),
++    install: true,
++  )
++endif
+diff --git a/src/plugins/meson.build b/src/plugins/meson.build
+index e300b29..ca6ecb1 100644
+--- a/src/plugins/meson.build
++++ b/src/plugins/meson.build
+@@ -1,5 +1,5 @@
+ gtk_dep = dependency('gtk+-3.0', required: get_option('gtk'))
+-gtk4_dep = dependency('gtk4', required: get_option('gtk4'))
++gtk4_dep = dependency('gtk4', required: false)
+ 
+ plugin_include_path = include_directories('.')
+ 
+@@ -11,6 +11,11 @@ if gtk_dep.found()
+   subdir('gtk')
+ endif
+ 
+-if gtk4_dep.found()
++get_option('gtk4').enable_auto_if(gtk4_dep.found() or get_option('gtk4_client') != '')
++
++if get_option('gtk4').enabled()
++  if not gtk4_dep.found()
++    error('gtk4 plugin enabled but gtk4 not found')
++  endif
+   subdir('gtk4')
+ endif
+-- 
+GitLab
+
+
+From 56bac78c77cebbb8a29f9751811f0f68fcac7b75 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Wed, 1 Apr 2026 00:14:48 +0200
+Subject: [PATCH 20/20] demo: Fix leaks
+
+---
+ demo/demo.c | 66 +++++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 52 insertions(+), 14 deletions(-)
+
+diff --git a/demo/demo.c b/demo/demo.c
+index 23c64da..c9bda6b 100644
+--- a/demo/demo.c
++++ b/demo/demo.c
+@@ -968,6 +968,7 @@ registry_handle_global(void *user_data,
+ 		seat->wl_seat = wl_registry_bind(wl_registry,
+ 						 id, &wl_seat_interface, 3);
+ 		wl_seat_add_listener(seat->wl_seat, &seat_listener, seat);
++		wl_list_insert(&seats, &seat->link);
+ 	} else if (strcmp(interface, "wl_output") == 0) {
+ 		if (version < 2) {
+ 			fprintf(stderr, "%s version 3 required but only version "
+@@ -1297,24 +1298,44 @@ static struct wl_surface_listener surface_listener = {
+ static void
+ free_outputs()
+ {
+-	struct output *output;
+-	struct window_output *window_output, *window_output_tmp;
+-
+-	wl_list_for_each(output, &outputs, link) {
+-		struct window *window;
++	struct output *output, *tmp;
+ 
+-		wl_list_for_each(window, &windows, link) {
+-			wl_list_for_each_safe(window_output, window_output_tmp, &window->outputs, link) {
+-				if (window_output->output == output) {
+-					wl_list_remove(&window_output->link);
+-					free(window_output);
+-				}
+-			}
+-		}
++	wl_list_for_each_safe(output, tmp, &outputs, link) {
+ 		wl_list_remove(&output->link);
+ 		wl_output_destroy(output->wl_output);
+ 		free(output);
+-		break;
++	}
++}
++
++static void
++free_seats(void)
++{
++	struct seat *seat, *tmp_seat;
++
++	wl_list_for_each_safe(seat, tmp_seat, &seats, link) {
++		struct pointer_output *pointer_output, *tmp_pointer_output;
++
++		wl_list_for_each_safe(pointer_output, tmp_pointer_output,
++				      &seat->pointer_outputs, link) {
++			wl_list_remove(&pointer_output->link);
++			free(pointer_output);
++		}
++		wl_list_remove(&seat->link);
++		if (seat->cursor_surface)
++			wl_surface_destroy(seat->cursor_surface);
++		if (seat->cursor_theme)
++			wl_cursor_theme_destroy(seat->cursor_theme);
++		if (seat->xkb_state)
++			xkb_state_unref(seat->xkb_state);
++		if (seat->xkb_context)
++			xkb_context_unref(seat->xkb_context);
++		if (seat->wl_pointer)
++			wl_pointer_release(seat->wl_pointer);
++		if (seat->wl_keyboard)
++			wl_keyboard_release(seat->wl_keyboard);
++		wl_seat_release(seat->wl_seat);
++		free(seat->name);
++		free(seat);
+ 	}
+ }
+ 
+@@ -1356,6 +1377,7 @@ static void
+ window_free(struct window *window)
+ {
+ 	struct seat *seat;
++	struct window_output *window_output, *window_output_tmp;
+ 
+ 	wl_list_for_each(seat, &seats, link) {
+ 		if (seat->pointer_focus == window->wl_surface)
+@@ -1363,6 +1385,13 @@ window_free(struct window *window)
+ 		if (seat->keyboard_focus == window->wl_surface)
+ 			seat->keyboard_focus = NULL;
+ 	}
++
++	wl_list_for_each_safe(window_output,
++			      window_output_tmp,
++			      &window->outputs, link) {
++		wl_list_remove(&window_output->link);
++		free(window_output);
++	}
+ 	wl_list_remove(&window->link);
+ 	libdecor_frame_unref(window->frame);
+ 	wl_surface_destroy(window->wl_surface);
+@@ -1430,7 +1459,16 @@ main(int argc,
+ 	}
+ 
+ 	free_outputs();
++	free_seats();
++	if (wl_compositor)
++		wl_compositor_destroy(wl_compositor);
++	if (wl_shm)
++		wl_shm_destroy(wl_shm);
++	if (xdg_wm_base)
++		xdg_wm_base_destroy(xdg_wm_base);
+ 	libdecor_unref(context);
++	wl_registry_destroy(wl_registry);
++	wl_display_disconnect(wl_display);
+ 
+ 	return EXIT_SUCCESS;
+ }
+-- 
+GitLab
+
+
