@@ -1,0 +1,15 @@
+# Template file for 'guile-lib'
+pkgname=guile-lib
+version=0.2.8
+revision=1
+build_style=gnu-configure
+configure_args="--with-guile-site"
+hostmakedepends="automake libtool texinfo pkg-config guile"
+makedepends="guile-devel"
+depends="guile"
+short_desc="Down-scaled, limited-scope CPAN for Guile"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-3.0-or-later"
+homepage="https://www.nongnu.org/guile-lib/"
+distfiles="https://download.savannah.nongnu.org/releases/guile-lib/guile-lib-${version}.tar.gz"
+checksum=64e902ee0cbb2cee1efb8168c3bf9ed49e0b32a8a23db863e83bf14817d767d9
