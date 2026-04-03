@@ -1,0 +1,14 @@
+# Template file for 'guile-ini'
+pkgname=guile-ini
+version=0.5.6
+revision=1
+build_style=gnu-configure
+hostmakedepends="automake libtool texinfo pkg-config guile"
+makedepends="guile-devel guile-smc guile-lib"
+depends="guile"
+short_desc="Guile library for working with INI format"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/artyom-poptsov/guile-ini"
+distfiles="https://github.com/artyom-poptsov/guile-ini/releases/download/v${version}/guile-ini-${version}.tar.gz"
+checksum=15c01866ed22727d6a1991ee1752602635cd03752f4cf7390614fdbc3e610f5b
