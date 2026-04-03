@@ -1,0 +1,18 @@
+# Template file for 'guile-fibers'
+pkgname=guile-fibers
+version=1.4.2
+revision=1
+build_style=gnu-configure
+hostmakedepends="automake libtool texinfo pkg-config guile"
+makedepends="guile-devel"
+depends="guile"
+short_desc="Concurrent ML-like concurrency for Guile"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-3.0-or-later"
+homepage="https://codeberg.org/guile/fibers"
+distfiles="https://codeberg.org/guile/fibers/archive/v${version}.tar.gz"
+checksum=bf61f58fdea48b4b28a9683d4493fcbced2ce2d7d98a7c1b1234353161de1ece
+
+pre_configure() {
+	autoreconf -fi
+}
