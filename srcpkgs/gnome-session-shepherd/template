@@ -1,0 +1,20 @@
+# Template file for 'gnome-session-shepherd'
+pkgname=gnome-session-shepherd
+version=0.9
+revision=1
+build_style=meson
+configure_args="-Dsystem_tests=disabled"
+hostmakedepends="glib-devel gettext pkg-config xmlto guile texinfo"
+makedepends="elogind-devel guile-devel shepherd guile-lib
+ guile-gi guile-ini guile-smc"
+depends="shepherd guile-gi guile-smc guile-ini guile-lib"
+short_desc="GNOME session management utilities"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-2.0-or-later, LGPL-2.1-or-later"
+homepage="https://gitlab.gnome.org/noe/gnome-session-shepherd"
+distfiles="https://gitlab.gnome.org/noe/gnome-session-shepherd/-/archive/${version}/gnome-session-shepherd-${version}.tar.gz"
+checksum=c4fb3187c7a66dd38c14cf2814b4084de1112478cf806dd51c6cec9fafc48b15
+
+provides="gnome-session-50.0_1"
+conflicts="gnome-session>=0"
+replaces="gnome-session>=0"
