@@ -1,0 +1,15 @@
+# Template file for 'guile-gi'
+pkgname=guile-gi
+version=0.3.2
+revision=1
+build_style=gnu-configure
+hostmakedepends="automake libtool texinfo pkg-config guile glib-devel"
+makedepends="guile-devel libglib-devel gobject-introspection"
+depends="guile"
+short_desc="Bindings for GObject Introspection and libgirepository for Guile"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/spk121/guile-gi"
+distfiles="https://github.com/spk121/guile-gi/releases/download/v0.3.2/guile_gi-${version}.tar.gz"
+checksum=7e35b9b661e331a45bc44f4e4093b748693c603de94d728098a7a8e71f5c3505
+CFLAGS="-Wno-incompatible-pointer-types"
