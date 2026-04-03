@@ -1,0 +1,14 @@
+# Template file for 'guile-ini'
+pkgname=guile-smc
+version=0.6.4
+revision=1
+build_style=gnu-configure
+hostmakedepends="automake libtool texinfo pkg-config guile"
+makedepends="guile-devel guile-lib"
+depends="guile"
+short_desc="Guile state machine compiler"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/artyom-poptsov/guile-smc"
+distfiles="https://github.com/artyom-poptsov/guile-smc/releases/download/v${version}/guile-smc-${version}.tar.gz"
+checksum=67d4d619fd632708341a75274890d32833cbf658ead285ce5e5e091cae6aeebd
