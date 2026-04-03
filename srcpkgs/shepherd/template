@@ -1,0 +1,23 @@
+# Template file for 'shepherd'
+pkgname=shepherd
+version=1.0.9
+revision=1
+build_style=gnu-configure
+configure_args="--with-bash-completion-dir=/usr/share/bash-completion/completions"
+hostmakedepends="pkg-config texinfo guile guile-fibers"
+makedepends="guile-devel"
+depends="guile guile-fibers"
+short_desc="Extensible service manager"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-3.0-or-later"
+homepage="https://shepherding.services/"
+distfiles="${GNU_SITE}/shepherd/shepherd-${version}.tar.gz"
+checksum=e488c585c8418df6e8f476dca81b72910f337c9cd3608fb467de5260004000d6
+
+post_install() {
+	# Move files that conflict with runit-void
+	mkdir -p ${DESTDIR}/usr/libexec/shepherd
+	mv ${DESTDIR}/usr/bin/halt ${DESTDIR}/usr/libexec/shepherd
+	mv ${DESTDIR}/usr/bin/reboot ${DESTDIR}/usr/libexec/shepherd
+	mv ${DESTDIR}/usr/bin/shutdown ${DESTDIR}/usr/libexec/shepherd
+}
