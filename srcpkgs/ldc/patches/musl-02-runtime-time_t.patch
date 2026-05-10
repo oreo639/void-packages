@@ -1,0 +1,96 @@
+diff --git a/runtime/druntime/src/core/stdc/config.d b/runtime/druntime/src/core/stdc/config.d
+index 952ceac..9a319db 100644
+--- a/runtime/druntime/src/core/stdc/config.d
++++ b/runtime/druntime/src/core/stdc/config.d
+@@ -670,11 +670,15 @@ version (unittest)
+ version (CRuntime_Musl)
+ {
+     version (CRuntime_Musl_Pre_Time64)
++    {
+         enum muslRedirTime64 = false;
++        enum muslPreTime64 = true;
++    }
+     else
+     {
+         // time_t was defined as a C long in older Musl versions.
+         enum muslRedirTime64 = (c_long.sizeof == 4);
++        enum muslPreTime64 = false;
+     }
+ }
+ else
+diff --git a/runtime/druntime/src/core/sys/posix/sys/stat.d b/runtime/druntime/src/core/sys/posix/sys/stat.d
+index 762d6fc..2f6b16f 100644
+--- a/runtime/druntime/src/core/sys/posix/sys/stat.d
++++ b/runtime/druntime/src/core/sys/posix/sys/stat.d
+@@ -653,6 +653,34 @@ version (linux)
+     {
+         version (CRuntime_Musl)
+         {
++            static if (muslPreTime64) {
++            struct stat_t
++            {
++                dev_t       st_dev;
++                int         __st_dev_pad;
++                c_long      __st_ino;
++                mode_t      st_mode;
++                nlink_t     st_nlink;
++                uid_t       st_uid;
++                gid_t       st_gid;
++                dev_t       st_rdev;
++                int         __st_rdev_pad;
++                off_t       st_size;
++                blksize_t   st_blksize;
++                blkcnt_t    st_blocks;
++                timespec    st_atim;
++                timespec    st_mtim;
++                timespec    st_ctim;
++                extern(D) @safe @property inout pure nothrow
++                {
++                    ref inout(time_t) st_atime() return { return st_atim.tv_sec; }
++                    ref inout(time_t) st_mtime() return { return st_mtim.tv_sec; }
++                    ref inout(time_t) st_ctime() return { return st_ctim.tv_sec; }
++                }
++                ino_t       st_ino;
++            }
++            static assert(stat_t.sizeof == 104);
++            } else {
+             struct stat_t
+             {
+                 dev_t st_dev;
+@@ -687,6 +715,7 @@ version (linux)
+                 }
+             }
+             static assert(stat_t.sizeof == 152);
++            }
+         }
+         else
+         {
+diff --git a/runtime/druntime/src/core/sys/posix/sys/types.d b/runtime/druntime/src/core/sys/posix/sys/types.d
+index 859c4ea..f0a9c7d 100644
+--- a/runtime/druntime/src/core/sys/posix/sys/types.d
++++ b/runtime/druntime/src/core/sys/posix/sys/types.d
+@@ -146,7 +146,7 @@ version (linux)
+          */
+         version (D_X32)
+            alias long   time_t;
+-        else version (CRuntime_Musl_Pre_Time64)
++        else static if (muslPreTime64)
+             alias c_long time_t;
+         else
+             alias long  time_t;
+diff --git a/runtime/druntime/src/core/sys/posix/time.d b/runtime/druntime/src/core/sys/posix/time.d
+index fdd6b0a..c940425 100644
+--- a/runtime/druntime/src/core/sys/posix/time.d
++++ b/runtime/druntime/src/core/sys/posix/time.d
+@@ -466,7 +473,10 @@ else version (CRuntime_Bionic)
+ }
+ else version (CRuntime_Musl)
+ {
+-    static assert(timespec.sizeof == 16);
++    static if (muslPreTime64)
++        static assert(timespec.sizeof == 8);
++    else
++        static assert(timespec.sizeof == 16);
+ 
+     alias int clockid_t;
+     alias void* timer_t;

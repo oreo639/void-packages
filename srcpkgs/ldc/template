@@ -1,20 +1,25 @@
 # Template file for 'ldc'
 pkgname=ldc
-version=1.39.0
+version=1.42.0
 revision=1
-build_style=cmake
+_llvmver=21
+build_helper=ldc
+
 configure_args="
- -DINCLUDE_INSTALL_DIR=/usr/include/dlang/ldc
- -DBUILD_SHARED_LIBS=ON
+ -DCMAKE_INSTALL_PREFIX=/usr
+ -DCMAKE_INSTALL_LIBDIR=lib
+ -DBUILD_SHARED_LIBS=BOTH
  -DCMAKE_BUILD_TYPE=RelWithDebInfo
+ -DCONF_INST_DIR=/etc/ldc
  -DBASH_COMPLETION_COMPLETIONSDIR=/usr/share/bash-completion
- -DCOMPILE_D_MODULES_SEPARATELY=ON
- -DC_SYSTEM_LIBS='unwind;m;pthread;rt;dl'"
-conf_files="/etc/ldc2.conf"
-hostmakedepends="dmd llvm18 perl pkg-config"
-makedepends="libcurl-devel libffi-devel ncurses-devel zlib-devel
- llvm18-devel llvm-libunwind-devel"
-depends="ldc-runtime llvm-libunwind-devel"
+ -DLDC_DYNAMIC_COMPILE=OFF
+ -DPHOBOS_SYSTEM_ZLIB=ON
+ -DLDC_BUILD_RUNTIME=ON
+ -DLDC_BUNDLE_LLVM_TOOLS=OFF"
+hostmakedepends="cmake ninja pkg-config gdmd llvm${_llvmver} perl chrpath"
+makedepends="libcurl-devel libffi-devel ncurses-devel zlib-devel libzstd-devel
+ libedit-devel llvm${_llvmver}-devel lld${_llvmver}-devel llvm-libunwind-devel"
+depends="ldc-runtime-devel llvm-libunwind-devel"
 checkdepends="python3"
 short_desc="Portable D programming language compiler based on LLVM"
 maintainer="Auri <me@aurieh.me>"
@@ -22,19 +27,129 @@ license="BSD-3-Clause, BSL-1.0"
 homepage="https://wiki.dlang.org/LDC"
 changelog="https://raw.githubusercontent.com/ldc-developers/ldc/master/CHANGELOG.md"
 distfiles="https://github.com/ldc-developers/ldc/releases/download/v${version}/ldc-${version}-src.tar.gz"
-checksum=839bac36f6073318e36f0b163767e03bdbd3f57d99256b97494ac439b59a4562
-nopie=yes
-nocross="dmd compilation fails on cross"
+checksum=9bb0f628f869f7fc7b53c381a79742d29c17552c6f1a56b0a02aa289e65a0e3b
+# nopie=yes
 # tests timeout on musl; also require unpackaged python3-lit
-make_check=no
+# make_check=no
 
-post_install() {
-	vlicense LICENSE
+_sys="Linux;UNIX;Unix"
+if [ "$XBPS_TARGET_LIBC" = musl ]; then
+	_sys+=";musl"
+fi
+
+if [ "$CROSS_BUILD" ]; then
+	hostmakedepends+=" $makedepends"
+fi
+
+if [ "$XBPS_TARGET_WORDSIZE" = 32 ]; then
+	configure_args+=" -DC_SYSTEM_LIBS=unwind;atomic;m;pthread;rt;dl"
+else
+	configure_args+=" -DC_SYSTEM_LIBS=unwind;m;pthread;rt;dl"
+fi
+
+post_patch() {
+	case "${XBPS_TARGET_MACHINE}" in
+		armv*-musl) vsed -e 's/version (CRuntime_Musl_Pre_Time64)/static if (true)/g' -i runtime/druntime/src/core/stdc/config.d ;;
+	esac
+}
+
+do_build() {
+	local _ldc _major _minor _pver _flag
+
+	unset DFLAGS
+	msg_normal "Configuring ldc-for-build with gdc\n"
+	mkdir -p stage1
+	CC=$CC_FOR_BUILD CFLAGS="$CFLAGS_FOR_BUILD" \
+	CXX=$CXX_FOR_BUILD CXXFLAGS="$CXXFLAGS_FOR_BUILD" \
+	LD=$LD_FOR_BUILD LDFLAGS="$LDFLAGS_FOR_BUILD -lzstd -lz" \
+	DFLAGS="" \
+	cmake -G Ninja -B stage1 \
+		-DD_COMPILER='gdmd' \
+		-DPHOBOS_SYSTEM_ZLIB=ON \
+		-DLDC_BUNDLE_LLVM_TOOLS=OFF \
+		-DLLVM_ROOT_DIR="/usr/lib/llvm${_llvmver}" \
+		-DLDC_DYNAMIC_COMPILE=OFF
+	cmake --build stage1
+
+	cmake -G Ninja -B stage2 \
+		${configure_args} \
+		-DD_COMPILER="${wrksrc}/stage1/bin/ldmd2" \
+		-DC_SYSTEM_LIBS="unwind;m;pthread;rt;dl$_atomic" \
+		-DLLVM_ROOT_DIR="/usr/lib/llvm${_llvmver}"
+	cmake --build stage2
+}
+
+do_check() {
+	export LD_LIBRARY_PATH=$wrksrc/build/lib${XBPS_TARGET_WORDSIZE}
+	ninja -C build ${makejobs} ldc2-unittest \
+		druntime-test-runner-debug-shared \
+		druntime-test-runner-shared \
+		phobos2-test-runner-debug-shared \
+		phobos2-test-runner-shared \
+		build-run-dmd-testsuite
+	# has unknown type; cast it to its declared type
+	rm -f tests/dmd/runnable/gdb14313.d \
+		tests/dmd/runnable/gdb4181.d
+	# Ignored LD_LIBRARY_PATH
+	rm -f tests/dmd/dshell/dll.d
+	rm -f tests/dmd/dshell/dll_cxx.d
+	# No idea why they are failed
+	local _ignore="^core.atomic-debug|^std.range-debug"
+	if [ "$XBPS_TARGET_LIBC" = musl ]; then
+		rm -f tests/dmd/runnable/test17559.d \
+			tests/dmd/runnable/test19086.d
+		# import C can't find sigevent for unknown reason
+		_ignore+="|^druntime-test-importc_compare-"
+		_ignore+="|^std.experimental.allocator.building_blocks.allocator_list-debug-shared"
+	fi
+	if [ "$XBPS_TARGET_WORDSIZE" = 32 ]; then
+		# Something with int128, but std.int128 test passed
+		_ignore+="|ldc-unittest"
+	fi
+	cd build
+	ctest -E "$_ignore"
+}
+
+do_install() {
+	DESTDIR="${DESTDIR}" cmake --install stage2
+
+	# CMake added the rpaths to the shared libs (of stage1!) - strip them
+	chrpath -d "${DESTDIR}"/usr/lib/*.so* "${DESTDIR}"/usr/bin/*
+}
+
+libphobos-ldc_package() {
+	short_desc+=" - libphobos"
+	license="BSL-1.0"
+	pkg_install() {
+		vmove "usr/lib/libphobos2-ldc-shared.so.*"
+	}
 }
 
 ldc-runtime_package() {
 	short_desc+=" - D runtime"
+	license="BSL-1.0"
 	pkg_install() {
-		vmove "usr/lib/*.so*"
+		vmove "usr/lib/libdruntime-ldc-shared.so.*"
+	}
+}
+
+ldc-runtime-debug_package() {
+	short_desc+=" - D runtime - debug version"
+	license="BSL-1.0"
+	pkg_install() {
+		vlicense LICENSE
+		vmove "usr/lib/*-debug-*.so.*"
+	}
+}
+
+ldc-runtime-devel_package() {
+	short_desc+=" - D runtime - development files"
+	license="BSL-1.0"
+	depends="libphobos-ldc ldc-runtime ldc-runtime-debug llvm-libunwind-devel"
+	pkg_install() {
+		vmove usr/include
+		vmove "usr/lib/*.o"
+		vmove "usr/lib/*.so"
+		vmove "usr/lib/*.a"
 	}
 }
