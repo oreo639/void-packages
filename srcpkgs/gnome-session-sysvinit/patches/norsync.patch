@@ -1,0 +1,504 @@
+From 90830cfa6603111c6433e1d6bc9ea17896c0ccf6 Mon Sep 17 00:00:00 2001
+From: Carlos Eduardo <carana2099@gmail.com>
+Date: Tue, 12 May 2026 18:14:43 -0300
+Subject: [PATCH] migrate to no-rsync
+
+- libexecdir is made configurable
+- the remnants of gettext support are dropped
+---
+ README.md                                     |   6 +-
+ data/meson.build                              |  61 ---------
+ gnome-session/meson.build                     | 100 ---------------
+ meson.build                                   | 117 ++----------------
+ {tools => src}/gnome-session-ctl.c            |  10 +-
+ {gnome-session => src}/leader-sysvinit.c      |   0
+ src/meson.build                               |  35 ++++++
+ .../sysvinit/gnome-session-start.in           |   8 +-
+ {data => src}/sysvinit/gnome-session-stop     |   0
+ 9 files changed, 53 insertions(+), 284 deletions(-)
+ delete mode 100644 data/meson.build
+ delete mode 100644 gnome-session/meson.build
+ rename {tools => src}/gnome-session-ctl.c (95%)
+ rename {gnome-session => src}/leader-sysvinit.c (100%)
+ create mode 100644 src/meson.build
+ rename data/sysvinit/gnome-session-start => src/sysvinit/gnome-session-start.in (96%)
+ mode change 100755 => 100644
+ rename {data => src}/sysvinit/gnome-session-stop (100%)
+
+diff --git a/README.md b/README.md
+index 148b8e3..2c9f23b 100644
+--- a/README.md
++++ b/README.md
+@@ -4,11 +4,11 @@ This is a port of [gnome-session-openrc](https://github.com/swagtoy/gnome-sessio
+ 
+ It uses simple shell scripts (`gnome-session-start` and `gnome-session-stop`) to manage session components. The session leader spawns the start script and monitors a FIFO for shutdown signaling.
+ 
+-This requires **elogind** for session/seat management.
++# Building/Installing
+ 
+-# Building
++First, this requires GNOME Session with [swagtoy's no-systemd patch](https://gitlab.gnome.org/swagtoy/gnome-session/-/commit/419191d3897957bd8cd325f2167f3c8663969a13), [Dudemanguy's elogind patch](https://gitlab.gnome.org/GNOME/gnome-session/-/merge_requests/106), or any other means of disabling the official `gnome-session-ctl`.
+ 
+-Simply clone this repository and copy/replace its content to `gnome-session` source code folder, and build it normally.
++This project can be built with the standard `meson` workflow, ensuring the main GNOME session and this project are built with the same `--prefix` setting. Once it is installed, launching `gnome-session` will work.
+ 
+ # How it works
+ 
+diff --git a/data/meson.build b/data/meson.build
+deleted file mode 100644
+index 3e27940..0000000
+--- a/data/meson.build
++++ /dev/null
+@@ -1,61 +0,0 @@
+-# Install the .desktop files that tell GDM about the GNOME session
+-
+-wayland_desktops = [
+-  'gnome',
+-]
+-foreach name : wayland_desktops
+-  desktop = name + '.desktop'
+-  desktop_in = configure_file(
+-    input: desktop + '.in.in',
+-    output: desktop + '.in',
+-    configuration: {
+-      'bindir': session_bindir,
+-      'canrunheadless': 'true',
+-    },
+-  )
+-  desktop_target = i18n.merge_file(
+-    type: 'desktop',
+-    input: desktop_in,
+-    output: desktop,
+-    po_dir: po_dir,
+-    install: true,
+-    install_dir: session_datadir / 'wayland-sessions',
+-  )
+-endforeach
+-
+-# Install sysvinit session helper scripts
+-
+-install_data(
+-'sysvinit/gnome-session-start',
+-'sysvinit/gnome-session-stop',
+-install_dir: session_libexecdir,
+-install_mode: 'rwxr-xr-x',
+-)
+-
+-# Install some other misc. configuration files
+-
+-i18n.merge_file(
+-  type: 'desktop',
+-  input: 'gnome.session.desktop',
+-  output: 'gnome.session',
+-  po_dir: po_dir,
+-  install: true,
+-  install_dir: join_paths(session_pkgdatadir, 'sessions')
+-)
+-
+-install_data(
+-  'org.gnome.SessionManager.gschema.xml',
+-  install_dir: join_paths(session_datadir, 'glib-2.0', 'schemas'),
+-)
+-
+-install_data(
+-  'gnome-portals.conf',
+-  install_dir: session_datadir / 'xdg-desktop-portal',
+-)
+-
+-if get_option('mimeapps')
+-  install_data(
+-    'gnome-mimeapps.list',
+-    install_dir: session_datadir / 'applications',
+-  )
+-endif
+diff --git a/gnome-session/meson.build b/gnome-session/meson.build
+deleted file mode 100644
+index b7243ef..0000000
+--- a/gnome-session/meson.build
++++ /dev/null
+@@ -1,100 +0,0 @@
+-sources = files(
+-  'gsm-util.c',
+-  'leader-main.c'
+-)
+-
+-cflags = [
+-  '-DLOCALE_DIR="@0@"'.format(session_localedir),
+-  '-DDATA_DIR="@0@"'.format(session_pkgdatadir),
+-  '-DLIBEXECDIR="@0@"'.format(session_libexecdir)
+-]
+-
+-executable(
+-  meson.project_name(),
+-  sources,
+-  include_directories: top_inc,
+-  dependencies: session_bin_deps,
+-  c_args: cflags,
+-  install: true,
+-  install_dir: session_bindir
+-)
+-
+-sources = files(
+-    'gsm-util.c'
+-)
+-
+-if use_sysvinit
+-  sources += files('leader-sysvinit.c')
+-else
+-  sources += files('leader-systemd.c')
+-endif
+-
+-executable(
+-  meson.project_name() + '-init-worker',
+-  sources,
+-  include_directories: top_inc,
+-  dependencies: session_bin_deps,
+-  c_args: cflags,
+-  install: true,
+-  install_dir: session_libexecdir
+-)
+-
+-sources = files(
+-  'gsm-app.c',
+-  'gsm-client.c',
+-  'gsm-inhibitor.c',
+-  'gsm-manager.c',
+-  'gsm-presence.c',
+-  'gsm-session-fill.c',
+-  'gsm-session-save.c',
+-  'gsm-shell.c',
+-  'gsm-store.c',
+-  'gsm-system.c',
+-  'gsm-systemd.c',
+-  'gsm-util.c',
+-  'service-main.c'
+-)
+-
+-dbus_ifaces = [
+-  'org.gnome.SessionManager',
+-  'org.gnome.SessionManager.ClientPrivate',
+-  'org.gnome.SessionManager.Inhibitor',
+-  'org.gnome.SessionManager.Presence',
+-]
+-
+-xml_dbus_docs = []
+-
+-foreach iface: dbus_ifaces
+-  out = gnome.gdbus_codegen(
+-    iface,
+-    iface + '.xml',
+-    interface_prefix: iface + '.',
+-    namespace: 'Gsm',
+-    docbook: 'ref'
+-  )
+-  sources += [out[0], out[1]] # .c/.h sources
+-  xml_dbus_docs += out[2] # docbook XML
+-endforeach
+-
+-executable(
+-  meson.project_name() + '-service',
+-  sources,
+-  include_directories: top_inc,
+-  dependencies: session_bin_deps,
+-  c_args: cflags,
+-  install: true,
+-  install_dir: session_libexecdir
+-)
+-
+-units = [
+-  ['test-client-dbus', [], [gio_dep]],
+-]
+-
+-foreach unit: units
+-  executable(
+-    unit[0],
+-    [unit[0] + '.c'] + unit[1],
+-    include_directories: top_inc,
+-    dependencies: unit[2]
+-  )
+-endforeach
+diff --git a/meson.build b/meson.build
+index 181f99a..e4dd06b 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1,147 +1,48 @@
+ project(
+-  'gnome-session', 'c',
++  'gnome-session-sysvinit', 'c',
+   version: '50.0',
+   license: 'GPL2+',
+-  default_options: 'buildtype=debugoptimized',
+-  meson_version: '>= 0.60.0'
++  meson_version: '>= 0.61.0'
+ )
+ 
+ session_version = meson.project_version()
+ session_api_name = '@0@-@1@'.format(meson.project_name(), session_version.split('.')[0])
+ 
+ session_prefix = get_option('prefix')
+-session_bindir = join_paths(session_prefix, get_option('bindir'))
+ session_datadir = join_paths(session_prefix, get_option('datadir'))
+ session_libexecdir = join_paths(session_prefix, get_option('libexecdir'))
+-session_localedir = join_paths(session_prefix, get_option('localedir'))
+-session_sysconfdir = join_paths(session_prefix, get_option('sysconfdir'))
+ 
+-session_pkgdatadir = join_paths(session_datadir, meson.project_name())
+-
+-cc = meson.get_compiler('c')
+-
+-config_h = configuration_data()
+-
+-# defines
+ set_defines = [
+   # package
+   ['PACKAGE', meson.project_name()],
+   ['PACKAGE_VERSION', session_version],
+   ['VERSION', session_version],
+-  # i18n
+-  ['GETTEXT_PACKAGE', meson.project_name()]
+ ]
+ 
+-foreach define: set_defines
+-  config_h.set_quoted(define[0], define[1])
+-endforeach
+-
+-# compiler flags
+-common_flags = ['-DHAVE_CONFIG_H']
+-
+-if get_option('deprecation_flags')
+-  common_flags += [
+-    '-DBONOBO_DISABLE_DEPRECATED',
+-    '-DBONOBO_DISABLE_SINGLE_INCLUDES',
+-    '-DBONOBO_UI_DISABLE_DEPRECATED',
+-    '-DBONOBO_UI_DISABLE_SINGLE_INCLUDES',
+-    '-DGNOME_DISABLE_DEPRECATED',
+-    '-DGNOME_DISABLE_SINGLE_INCLUDES',
+-    '-DLIBGLADE_DISABLE_DEPRECATED',
+-    '-DLIBGLADE_DISABLE_SINGLE_INCLUDES',
+-    '-DGNOME_VFS_DISABLE_DEPRECATED',
+-    '-DGNOME_VFS_DISABLE_SINGLE_INCLUDES',
+-    '-DWNCK_DISABLE_DEPRECATED',
+-    '-DWNCK_DISABLE_SINGLE_INCLUDES',
+-    '-DLIBSOUP_DISABLE_DEPRECATED',
+-    '-DLIBSOUP_DISABLE_SINGLE_INCLUDES'
+-  ]
+-endif
+-
+-compiler_flags = []
+-if get_option('debug')
+-  test_cflags = [
+-    '-Werror=format=2',
+-    '-Werror=implicit-function-declaration',
+-    '-Werror=init-self',
+-    '-Werror=missing-include-dirs',
+-    '-Werror=missing-prototypes',
+-    '-Werror=pointer-arith',
+-    '-Werror=return-type',
+-    '-Wnested-externs',
+-    '-Wstrict-prototypes'
+-  ]
+-
+-  compiler_flags += cc.get_supported_arguments(test_cflags)
+-endif
+-
+-add_project_arguments(common_flags + compiler_flags, language: 'c')
+-
+ glib_req_version = '>= 2.82.0'
+ 
+-gio_dep = dependency('gio-2.0', version: glib_req_version)
+-
+-session_deps = [
+-  gio_dep,
++session_bin_deps = [
+   dependency('glib-2.0', version: glib_req_version),
+-  dependency('gnome-desktop-4'),
+-  dependency('json-glib-1.0', version: '>= 0.10')
+-]
+-
+-elogind_dep = dependency('libelogind', version: '>=209', required: true)
+-  session_bin_deps = session_deps + [
+-  elogind_dep,
++  dependency('gio-2.0', version: glib_req_version),
+   dependency('gio-unix-2.0', version: glib_req_version),
++  dependency('libelogind', version: '>=209', required: true),
+ ]
+ 
+-use_sysvinit = true
+-
+-
+-configure_file(
+-  output: 'config.h',
+-  configuration: config_h
+-)
+-
+-gnome = import('gnome')
+-i18n = import('i18n')
+ pkg = import('pkgconfig')
+ 
+-po_dir = join_paths(meson.project_source_root(), 'po')
+-
+ top_inc = include_directories('.')
+ 
+-subdir('gnome-session')
+-subdir('tools')
+-subdir('data')
+-subdir('doc')
+-subdir('po')
++conf_data = configuration_data()
++conf_data.set_quoted('LIBEXECDIR', session_libexecdir)
+ 
+-gnome.post_install(
+-  glib_compile_schemas: true,
+-)
++configure_file(output: 'config.h', configuration: conf_data)
+ 
+-summary_options = {
+- 'Debug mode': get_option('debug'),
+- 'Use *_DISABLE_DEPRECATED': get_option('deprecation_flags'),
+- 'Build Docbook': get_option('docbook'),
+- 'Build manpages': get_option('man'),
+-}
++subdir('src')
+ 
+ summary_dirs = {
+   'prefix': get_option('prefix'),
+   'datadir': session_datadir,
+-  'bindir': session_bindir,
+   'libexecdir': session_libexecdir,
+-  'localedir': session_localedir,
+-  'mandir': get_option('mandir'),
+-  'sysconfdir': session_sysconfdir,
+-  'pkgdatadir': session_pkgdatadir,
+-}
+-
+-summary_vars = {
+-  'Use sysvinit': use_sysvinit,
+ }
+ 
+ summary(summary_dirs, section: 'Directories')
+-summary(summary_options, section: 'Build Options')
+-summary(summary_vars, section: 'Build-time Variables')
+diff --git a/tools/gnome-session-ctl.c b/src/gnome-session-ctl.c
+similarity index 95%
+rename from tools/gnome-session-ctl.c
+rename to src/gnome-session-ctl.c
+index 0c1fff0..7d33999 100644
+--- a/tools/gnome-session-ctl.c
++++ b/src/gnome-session-ctl.c
+@@ -50,7 +50,7 @@ async_run_cmd (gchar **argv, GError **error)
+ static gboolean
+ sysvinit_run_session_stop (GError **error)
+ {
+-        g_autofree char *stop_script = g_build_filename ("/usr/libexec",
++        g_autofree char *stop_script = g_build_filename (LIBEXECDIR,
+                                                          "gnome-session-stop",
+                                                          NULL);
+         gchar *argv[] = { stop_script, NULL };
+@@ -202,14 +202,8 @@ main (int argc, char *argv[])
+                 { NULL },
+         };
+ 
+-        /* Initialize the i18n stuff */
+-        setlocale (LC_ALL, "");
+-        bindtextdomain (GETTEXT_PACKAGE, LOCALE_DIR);
+-        bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+-        textdomain (GETTEXT_PACKAGE);
+-
+         ctx = g_option_context_new ("");
+-        g_option_context_add_main_entries (ctx, options, GETTEXT_PACKAGE);
++        g_option_context_add_main_entries (ctx, options, NULL);
+         if (! g_option_context_parse (ctx, &argc, &argv, &error)) {
+                 g_warning ("Unable to start: %s", error->message);
+                 exit (1);
+diff --git a/gnome-session/leader-sysvinit.c b/src/leader-sysvinit.c
+similarity index 100%
+rename from gnome-session/leader-sysvinit.c
+rename to src/leader-sysvinit.c
+diff --git a/src/meson.build b/src/meson.build
+new file mode 100644
+index 0000000..38e6485
+--- /dev/null
++++ b/src/meson.build
+@@ -0,0 +1,35 @@
++sources = files(
++	'leader-sysvinit.c',
++)
++
++executable(
++	'gnome-session-init-worker',
++	sources,
++	include_directories: top_inc,
++	dependencies: session_bin_deps,
++	install: true,
++	install_dir: session_libexecdir
++)
++
++sources = files(
++	'gnome-session-ctl.c',
++)
++
++executable(
++	'gnome-session-ctl',
++	sources,
++	include_directories: top_inc,
++	dependencies: session_bin_deps,
++	install: true,
++	install_dir: session_libexecdir
++)
++
++g_s_start = configure_file(input: 'sysvinit/gnome-session-start.in', output: 'gnome-session-start', configuration: conf_data)
++
++install_data(
++  g_s_start,
++  'sysvinit/gnome-session-stop',
++  install_dir: session_libexecdir,
++  install_mode: 'rwxr-xr-x',
++)
++
+diff --git a/data/sysvinit/gnome-session-start b/src/sysvinit/gnome-session-start.in
+old mode 100755
+new mode 100644
+similarity index 96%
+rename from data/sysvinit/gnome-session-start
+rename to src/sysvinit/gnome-session-start.in
+index 912ac4c..3a6ca8c
+--- a/data/sysvinit/gnome-session-start
++++ b/src/sysvinit/gnome-session-start.in
+@@ -90,12 +90,12 @@ write_pid() {
+ }
+ 
+ # Start session D-Bus service
+-/usr/libexec/gnome-session-service --session="$SESSION_NAME" &
++@LIBEXECDIR@/gnome-session-service --session="$SESSION_NAME" &
+ SERVICE_PID=$!
+ write_pid gnome-session-service $SERVICE_PID
+ 
+ # Start session monitor (reads the leader FIFO)
+-/usr/libexec/gnome-session-ctl --monitor &
++@LIBEXECDIR@/gnome-session-ctl --monitor &
+ write_pid gnome-session-monitor $!
+ 
+ # Wait for the gnome-session-monitor to claim its bus name
+@@ -152,7 +152,7 @@ fi
+ dbus-update-activation-environment --all
+ 
+ # Start GNOME Settings Daemon components
+-for _gsd in /usr/libexec/gsd-*; do
++for _gsd in @LIBEXECDIR@/gsd-*; do
+     [ -x "$_gsd" ] || continue
+     daemon="${_gsd##*/}"
+     "$_gsd" &
+@@ -161,7 +161,7 @@ done
+ unset _gsd daemon
+ 
+ # Signal session initialization complete
+-/usr/libexec/gnome-session-ctl --signal-init
++@LIBEXECDIR@/gnome-session-ctl --signal-init
+ 
+ # Wait for gnome-shell or gnome-session-service to exit.
+ wait -n $SHELL_PID $SERVICE_PID 2>/dev/null
+diff --git a/data/sysvinit/gnome-session-stop b/src/sysvinit/gnome-session-stop
+similarity index 100%
+rename from data/sysvinit/gnome-session-stop
+rename to src/sysvinit/gnome-session-stop
+

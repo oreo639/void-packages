@@ -1,0 +1,16 @@
+# Template file for 'gnome-session-sysvinit'
+pkgname=gnome-session-sysvinit
+version=50.0
+revision=1
+build_style=meson
+hostmakedepends="glib-devel gettext pkg-config xmlto"
+makedepends="elogind-devel gnome-desktop-devel gtk+3-devel json-glib-devel
+ libglib-devel libICE-devel libSM-devel xtrans"
+depends="dconf desktop-file-utils bash gsettings-desktop-schemas
+ hicolor-icon-theme polkit"
+short_desc="GNOME session management utilities"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-2.0-or-later, LGPL-2.1-or-later"
+homepage="https://github.com/fulalas/gnome-session-sysvinit"
+distfiles="https://github.com/fulalas/gnome-session-sysvinit/archive/24fd52dfe2359d50b007d7f7076690105c2a1ce2.tar.gz"
+checksum=2afaba563fa97a19761d75482b05c7a68279051f92f79d8a3f109f9feaa39d88

@@ -1,0 +1,24 @@
+From 4dbf3f5d27543a508d37ccfba3ffad55439e3122 Mon Sep 17 00:00:00 2001
+From: Nathaniel Russell <46272571+nater1983@users.noreply.github.com>
+Date: Sat, 6 Jun 2026 17:14:08 -0500
+Subject: [PATCH] Add sleep before dbus activation in gnome-session-start
+
+Added a sleep command to allow display vars to catch up before dbus activation.
+---
+ data/sysvinit/gnome-session-start | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/data/sysvinit/gnome-session-start b/data/sysvinit/gnome-session-start
+index 912ac4c..9c9ce8f 100755
+--- a/data/sysvinit/gnome-session-start
++++ b/data/sysvinit/gnome-session-start
+@@ -149,6 +149,8 @@ fi
+ # Push the full session environment (locale, display, profile vars) to the
+ # dbus activation environment. All display vars are now set above, so --all
+ # is safe and avoids having to maintain an explicit list.
++# We need to sleep to let all display vars catch up before dbus activation.
++sleep 5
+ dbus-update-activation-environment --all
+ 
+ # Start GNOME Settings Daemon components
+

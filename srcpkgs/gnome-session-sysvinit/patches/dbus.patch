@@ -1,0 +1,43 @@
+From ad6932a4932eaf61829c42ed3e5d42cc60871e21 Mon Sep 17 00:00:00 2001
+From: Carlos Eduardo <carana2099@gmail.com>
+Date: Tue, 12 May 2026 17:40:34 -0300
+Subject: [PATCH] self-wrap over dbus-run-session
+
+---
+ data/sysvinit/gnome-session-start | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/data/sysvinit/gnome-session-start b/data/sysvinit/gnome-session-start
+index 912ac4c..19854dd 100755
+--- a/data/sysvinit/gnome-session-start
++++ b/data/sysvinit/gnome-session-start
+@@ -7,6 +7,15 @@
+ SESSION_TYPE="${1:-wayland}"
+ SESSION_NAME="${2:-gnome}"
+ 
++# Ensure the session D-Bus address is set
++if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
++    if [ -S "$XDG_RUNTIME_DIR/bus" ]; then
++        export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
++    else
++        exec dbus-run-session "$0" "$@"
++    fi
++fi
++
+ # Source system profile scripts, exactly as GDM's old wayland-session script did.
+ # Dot-sourcing preserves all GDM-passed variables (XDG_SESSION_ID, XDG_SEAT, etc.)
+ # and adds the profile vars (LANG, HOSTNAME, XKB_DEFAULT_*, etc.) on top.
+@@ -70,12 +79,6 @@ PIDDIR="${GNOME_SESSION_RUNDIR:-$XDG_RUNTIME_DIR}"
+ export XDG_CURRENT_DESKTOP=GNOME
+ export XDG_SESSION_TYPE="$SESSION_TYPE"
+ 
+-# Ensure the session D-Bus address is set
+-if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+-    if [ -S "$XDG_RUNTIME_DIR/bus" ]; then
+-        export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+-    fi
+-fi
+ 
+ # Add flatpak export paths if available
+ for d in "$HOME/.local/share/flatpak/exports/share" "/var/lib/flatpak/exports/share"; do
+
