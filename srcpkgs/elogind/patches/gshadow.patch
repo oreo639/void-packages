@@ -1,12 +1,43 @@
+Add missing gshadow definition.
+See: https://github.com/systemd/systemd/blob/main/src/include/musl/gshadow.h
+Issue: https://github.com/elogind/elogind/issues/362
+
 diff --git a/src/shared/user-record-nss.h b/src/shared/user-record-nss.h
 index 7a41be7..3a970a6 100644
 --- a/src/shared/user-record-nss.h
 +++ b/src/shared/user-record-nss.h
-@@ -2,7 +2,6 @@
+@@ -2,10 +2,33 @@
  #pragma once
  
  #include <grp.h>
 -#include <gshadow.h>
  #include <pwd.h>
  #include <shadow.h>
+ 
++#if !defined(__GLIBC__)
++#include <errno.h>
++#include <stddef.h>
++
++struct sgrp {
++        char *sg_namp;
++        char *sg_passwd;
++        char **sg_adm;
++        char **sg_mem;
++};
++
++static inline int getsgnam_r(
++                const char *__name,
++                struct sgrp *__result_buf,
++                char *__buffer,
++                size_t __buflen,
++                struct sgrp **__result) {
++
++        return EOPNOTSUPP; /* this function returns positive errno in case of error. */
++}
++#else
++#include <gshadow.h>
++#endif
++
+ #include "group-record.h"
+ #include "user-record.h"
  

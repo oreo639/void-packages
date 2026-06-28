@@ -1,14 +1,13 @@
 # Template file for 'elogind'
 pkgname=elogind
-version=252.39
-reverts="255.22_1 255.22_2"
+version=257.16
 revision=1
 build_style=meson
-configure_args="-Dcgroup-controller=elogind -Ddefault-hierarchy=legacy
- -Ddefault-kill-user-processes=false -Dhalt-path=/usr/bin/halt
- -Dkexec-path=/usr/bin/kexec -Dman=true -Dpolkit=true
- -Dreboot-path=/usr/bin/reboot -Drootlibdir=/usr/lib
- -Drootlibexecdir=/usr/libexec/elogind"
+configure_args="-Dcgroup-controller=elogind
+ -Dkexec-path=/usr/bin/kexec -Dman=enabled -Dpolkit=enabled
+ -Dreboot-path=/usr/bin/reboot -Dhalt-path=/usr/bin/halt
+ -Ddefault-kill-user-processes=false
+ --libexecdir=/usr/libexec/elogind"
 hostmakedepends="docbook-xsl glib-devel gperf gettext libxslt
  m4 pkg-config python3-Jinja2 shadow"
 makedepends="acl-devel eudev-libudev-devel libcap-devel
@@ -19,7 +18,7 @@ maintainer="Enno Boland <gottox@voidlinux.org>"
 license="GPL-2.0-or-later, LGPL-2.0-or-later"
 homepage="https://github.com/elogind/elogind"
 distfiles="https://github.com/${pkgname}/${pkgname}/archive/v${version}.tar.gz"
-checksum=5789c9d483dc236fbf72143dc9989329c399b6a507892c160b3c5852913123d5
+checksum=3c8146409bfb9daa77f272212c2b0bf0ae727c782ec87ece0d2d25e0e5bf5f4c
 conf_files="/etc/elogind/*.conf"
 # tests fail differently due to containerization and kernel features
 make_check=ci-skip
@@ -29,6 +28,7 @@ if [ "$XBPS_TARGET_LIBC" = "glibc" ]; then
 fi
 
 if [ "$XBPS_TARGET_LIBC" = "musl" ]; then
+	makedepends+=" musl-nscd-devel"
 	configure_args+=" -Dutmp=false"
 fi
 
