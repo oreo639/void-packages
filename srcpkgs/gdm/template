@@ -1,14 +1,13 @@
 # Template file for 'gdm'
 pkgname=gdm
-version=48.0
-revision=3
+version=50.1
+revision=1
 build_helper="gir"
 build_style=meson
 configure_args="
  -Ddefault-pam-config=arch -Dat-spi-registryd-dir=/usr/libexec
- -Dtcp-wrappers=false -Dscreenshot-dir=/var/lib/gdm/greeter
- -Dplymouth=enabled -Dxauth-dir=/run/gdm -Dpid-file=/run/gdm/gdm.pid
- -Dsystemd-journal=false -Dinitial-vt=7 -Dwayland-support=true
+ -Dplymouth=enabled -Dpid-file=/run/gdm/gdm.pid
+ -Dsystemd-journal=false -Dinitial-vt=7
  -Dselinux=disabled -Dlibaudit=disabled -Dgdm-xsession=true
  -Ddefault-path=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin
  -Dsystemdsystemunitdir=/usr/lib/systemd/system
@@ -17,9 +16,10 @@ configure_args="
 hostmakedepends="dconf gettext itstool pkg-config"
 makedepends="accountsservice-devel elogind-devel gettext-devel glib-devel
  iso-codes libSM-devel libcanberra-devel nss-devel pam-devel upower-devel
- plymouth-devel libgudev-devel polkit-devel"
+ plymouth-devel libgudev-devel polkit-devel dconf-devel"
 depends="gnome-settings-daemon gnome-shell gnome-session gnome-themes-extra
- gsettings-desktop-schemas xorg-server xorg-server-xwayland xrdb"
+ gsettings-desktop-schemas gnome-initial-setup xorg-server xorg-server-xwayland
+ xrdb"
 checkdepends="check-devel"
 short_desc="GNOME Display Manager"
 maintainer="Orphaned <orphan@voidlinux.org>"
@@ -29,7 +29,7 @@ homepage="https://wiki.gnome.org/Projects/GDM"
 #changelog="https://gitlab.gnome.org/GNOME/gdm/-/raw/gnome-48/NEWS"
 changelog="https://gitlab.gnome.org/GNOME/gdm/-/raw/main/NEWS"
 distfiles="${GNOME_SITE}/gdm/${version%%.*}/gdm-${version}.tar.xz"
-checksum=1bc06daff093ec7b5e37ecb4f92e5da3474a1b1ba076edb9151ee967d1c30adf
+checksum=770159373512192410f412b5d0c4678ec1573f1ae4b39c81fe75861fe8890174
 
 conf_files="
 	/etc/gdm/custom.conf
@@ -42,8 +42,12 @@ make_dirs="
 	/usr/share/gdm/env.d 0755 root root
 	/etc/gdm/env.d 0755 root root"
 # Create the 'gdm' system user/group.
-system_accounts="gdm"
+system_accounts="gdm gdmgreeter"
 gdm_homedir="/var/lib/gdm"
+gdmgreeter_uname="gdm-greeter"
+gdmgreeter_pgroup="gdm"
+gdmgreeter_group="gnome-initial-setup video"
+gdmgreeter_homedir="/var/lib/gdm-greeter"
 
 # Package build options
 build_options="gir"
