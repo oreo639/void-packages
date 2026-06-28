@@ -1,0 +1,20 @@
+diff --git a/gnome-session/leader-main.c b/gnome-session/leader-main.c
+index 8ccc06d3..87fa1362 100644
+--- a/gnome-session/leader-main.c
++++ b/gnome-session/leader-main.c
+@@ -185,6 +185,7 @@ main (int argc, char **argv)
+         gboolean show_version = FALSE;
+         gboolean disable_acceleration_check = FALSE;
+         gboolean no_reexec = FALSE;
++        gboolean autostart = FALSE;
+         g_autoptr (GOptionContext) options = NULL;
+         GStrvBuilder *argv_dup_builder = NULL;
+         g_auto (GStrv) argv_dup = NULL;
+@@ -195,6 +196,7 @@ main (int argc, char **argv)
+                 { "version", 0, 0, G_OPTION_ARG_NONE, &show_version, N_("Version of this application"), NULL },
+                 { "disable-acceleration-check", 0, 0, G_OPTION_ARG_NONE, &disable_acceleration_check, N_("This option is ignored"), NULL },
+                 { "no-reexec", 0, 0, G_OPTION_ARG_NONE, &no_reexec, N_("Don't re-exec into a login shell"), NULL },
++                { "autostart", 0, 0, G_OPTION_ARG_NONE, &autostart, NULL, NULL },
+                 { NULL, 0, 0, 0, NULL, NULL, NULL }
+         };
+ 
